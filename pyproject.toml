@@ -1,0 +1,21 @@
+[build-system]
+requires = ["setuptools>=69"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "sentinelops"
+version = "0.1.0"
+description = "Industrial predictive maintenance and safety analytics"
+requires-python = ">=3.11"
+dependencies = ["numpy>=1.26,<3", "pandas>=2.2,<3", "scikit-learn>=1.5,<2"]
+
+[project.optional-dependencies]
+dev = ["pytest>=8,<10", "pyyaml>=6,<7"]
+databricks = ["mlflow==3.16.1", "skops==0.15.0"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+pythonpath = ["src"]
+testpaths = ["tests"]

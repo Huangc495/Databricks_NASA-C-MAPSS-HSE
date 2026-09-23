@@ -1,0 +1,27 @@
+bundle:
+  name: sentinelops
+workspace:
+  host: https://adb-7405619144539463.3.azuredatabricks.net
+include:
+  - resources/*.yml
+variables:
+  catalog:
+    description: Existing Unity Catalog catalog with CREATE SCHEMA permission
+    default: sentinelops_dev
+  schema:
+    default: sentinelops_dev
+sync:
+  include:
+    - src/**
+    - jobs/**
+    - pipelines/**
+  exclude:
+    - data/**
+    - artifacts/**
+    - .venv/**
+targets:
+  dev:
+    default: true
+    mode: development
+    presets:
+      pipelines_development: false

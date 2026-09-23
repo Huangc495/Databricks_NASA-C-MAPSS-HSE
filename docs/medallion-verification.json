@@ -1,0 +1,25 @@
+{
+  "counts": {
+    "bronze.cmapss_lines": 33727,
+    "bronze.cmapss_labels": 100,
+    "silver.cmapss_observations": 33727,
+    "silver.cmapss_quarantine": 0,
+    "silver.cmapss_conflicts": 0,
+    "silver.cmapss_endpoint_labels": 100,
+    "gold.cmapss_features": 33727,
+    "gold.cmapss_training_labels": 20631,
+    "gold.cmapss_test_endpoints": 100
+  },
+  "feature_parity": true,
+  "official_endpoint_labels": true,
+  "primary_key": [
+    "dataset",
+    "subset",
+    "split",
+    "unit",
+    "cycle"
+  ],
+  "quality_probe": false,
+  "verified_runs": 1,
+  "billing_snapshot_error": "[INSUFFICIENT_PERMISSIONS] Insufficient privileges:\nUser does not have USE SCHEMA on Schema 'system.billing'. SQLSTATE: 42501\n\nJVM stacktrace:\norg.apache.spark.sql.AnalysisException\n\tat com.databricks.sql.managedcatalog.client.TypeConversionUtils.toAnalysisException(TypeConversionUtils.scala:3836)\n\tat com.databricks.sql.managedcatalog.client.TypeConversionUtils.toAnalysisException$(TypeConversionUtils.scala:3819)\n\tat com.databricks.managedcatalog.TypeConversionUtils$.toAnalysisException(ManagedCatalogClientShim.scala:18)\n\tat com.databricks.sql.managedcatalog.client.TypeConversionUtils.toCatalyst(TypeConversionUtils.scala:3509)\n\tat com.databricks.sql.managedcatalog.client.TypeConversionUtils.toCatalyst$(TypeConversionUtils.scala:3484)\n\tat com.databricks.managedcatalog.TypeConversionUtils$.toCatalyst(ManagedCatalogClientShim.scala:18)\n\tat com.databricks.sql.managedcatalog.client.ManagedCatalogClientImpl.$anonfun$bulkGetMetadataWithPermissions$25(ManagedCatalogClientImpl.scala:8226)\n\tat s"
+}

@@ -1,0 +1,111 @@
+{
+  "pipeline_id": "77ecd502-9283-4528-83e3-7ab8666ada1e",
+  "update_id": "2daec6e4-74bd-4a8b-b6f1-a37e40a9f5f7",
+  "state": "COMPLETED",
+  "flows": [
+    {
+      "flow": "sentinelops_dev.gold.cmapss_test_endpoints",
+      "output_rows": 100,
+      "data_quality": {
+        "dropped_records": 0,
+        "expectations": [
+          {
+            "dataset": "sentinelops_dev.gold.cmapss_test_endpoints",
+            "failed_records": 0,
+            "name": "has_official_label",
+            "passed_records": 100
+          }
+        ],
+        "warned_records": 0
+      }
+    },
+    {
+      "flow": "sentinelops_dev.gold.cmapss_features",
+      "output_rows": 33727,
+      "data_quality": {
+        "dropped_records": 0,
+        "warned_records": 0
+      }
+    },
+    {
+      "flow": "sentinelops_dev.gold.cmapss_training_labels",
+      "output_rows": 20631,
+      "data_quality": {
+        "dropped_records": 0,
+        "warned_records": 0
+      }
+    },
+    {
+      "flow": "sentinelops_dev.silver.cmapss_quarantine",
+      "output_rows": 0,
+      "data_quality": {
+        "dropped_records": 0,
+        "warned_records": 0
+      }
+    },
+    {
+      "flow": "sentinelops_dev.silver.cmapss_observations",
+      "output_rows": 33727,
+      "data_quality": {
+        "dropped_records": 0,
+        "expectations": [
+          {
+            "dataset": "valid_lines",
+            "failed_records": 0,
+            "name": "valid_trajectory",
+            "passed_records": 33727
+          }
+        ],
+        "warned_records": 0
+      }
+    },
+    {
+      "flow": "sentinelops_dev.silver.cmapss_endpoint_labels",
+      "output_rows": 100,
+      "data_quality": {
+        "dropped_records": 0,
+        "expectations": [
+          {
+            "dataset": "sentinelops_dev.silver.cmapss_endpoint_labels",
+            "failed_records": 0,
+            "name": "official_label",
+            "passed_records": 100
+          },
+          {
+            "dataset": "sentinelops_dev.silver.cmapss_endpoint_labels",
+            "failed_records": 0,
+            "name": "one_label_per_engine",
+            "passed_records": 100
+          }
+        ],
+        "warned_records": 0
+      }
+    },
+    {
+      "flow": "sentinelops_dev.silver.cmapss_conflicts",
+      "output_rows": 0,
+      "data_quality": {
+        "dropped_records": 0,
+        "expectations": [
+          {
+            "dataset": "valid_lines",
+            "failed_records": 0,
+            "name": "valid_trajectory",
+            "passed_records": 33727
+          }
+        ],
+        "warned_records": 0
+      }
+    },
+    {
+      "flow": "sentinelops_dev.bronze.cmapss_lines",
+      "output_rows": null,
+      "data_quality": null
+    },
+    {
+      "flow": "sentinelops_dev.bronze.cmapss_labels",
+      "output_rows": null,
+      "data_quality": null
+    }
+  ]
+}

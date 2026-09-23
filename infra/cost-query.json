@@ -1,0 +1,15 @@
+{
+  "type": "ActualCost",
+  "timeframe": "MonthToDate",
+  "dataset": {
+    "granularity": "Daily",
+    "aggregation": {"totalCost": {"name": "PreTaxCost", "function": "Sum"}},
+    "filter": {
+      "dimensions": {
+        "name": "ResourceGroupName",
+        "operator": "In",
+        "values": ["rg-sentinelops-dev", "rg-sentinelops-dev-managed"]
+      }
+    }
+  }
+}

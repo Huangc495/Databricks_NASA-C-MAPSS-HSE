@@ -1,0 +1,28 @@
+{
+  "job_id": 366011234786265,
+  "run_id": 205718877304121,
+  "result": "SUCCESS",
+  "counts": {
+    "bronze.cmapss_lines": 33736,
+    "bronze.cmapss_labels": 100,
+    "silver.cmapss_observations": 33727,
+    "silver.cmapss_quarantine": 5,
+    "silver.cmapss_conflicts": 1,
+    "silver.cmapss_endpoint_labels": 100,
+    "gold.cmapss_features": 33727,
+    "gold.cmapss_training_labels": 20631,
+    "gold.cmapss_test_endpoints": 100
+  },
+  "feature_parity": true,
+  "official_endpoint_labels": true,
+  "primary_key": [
+    "dataset",
+    "subset",
+    "split",
+    "unit",
+    "cycle"
+  ],
+  "quality_probe": true,
+  "verified_runs": 2,
+  "billing_snapshot_error": "[INSUFFICIENT_PERMISSIONS] Insufficient privileges: User does not have USE SCHEMA on Schema 'system.billing'. SQLSTATE: 42501"
+}

@@ -1,0 +1,55 @@
+resources:
+  jobs:
+    fd001_baseline:
+      name: sentinelops-fd001-baseline
+      max_concurrent_runs: 1
+      timeout_seconds: 900
+      performance_target: STANDARD
+      tasks:
+        - task_key: train_and_score
+          max_retries: 0
+          spark_python_task:
+            python_file: ../jobs/fd001.py
+            parameters:
+              - --catalog
+              - ${var.catalog}
+              - --schema
+              - ${var.schema}
+              - --source-root
+              - ${workspace.file_path}/src
+          environment_key: ml
+      environments:
+        - environment_key: ml
+          spec: &ml_environment
+            environment_version: '4'
+            dependencies:
+              - numpy==2.5.3
+              - pandas==2.3.3
+              - scikit-learn==1.9.1
+              - mlflow==3.16.1
+              - skops==0.15.0
+    # Consumes the verified Gold medallion tables. Run manually after cmapss_ingest.
+    cmapss_train:
+      name: sentinelops-cmapss-train
+      max_concurrent_runs: 1
+      timeout_seconds: 900
+      performance_target: STANDARD
+      tasks:
+        - task_key: train_from_gold
+          max_retries: 0
+          timeout_seconds: 900
+          spark_python_task:
+            python_file: ../jobs/train_medallion.py
+            parameters:
+              - --catalog
+              - ${var.catalog}
+              - --schema
+              - ${var.schema}
+              - --subset
+              - FD001
+              - --source-root
+              - ${workspace.file_path}/src
+          environment_key: ml
+      environments:
+        - environment_key: ml
+          spec: *ml_environment
