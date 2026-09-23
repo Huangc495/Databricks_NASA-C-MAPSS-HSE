@@ -67,8 +67,9 @@ reauthenticate interactively only if it has expired.
   Downloaded from the official GitHub release; archive SHA256 verified as
   `e3edc115f2aa714eac2a1591a27045cffb3c9e47b1b6da20ed2df083b42d1c98`.
 - Bicep compiler installed through Azure CLI.
-- Git initialized, but **no commit or remote was created**. All project source
-  files were still untracked at handover. Preserve them; they are completed work.
+- Git branch `main` holds the committed project (initial commit `a75d278`,
+  authored as Cheng Huang <cheng.huang.ca@outlook.com> via repo-local config).
+  **No remote exists**, so nothing has been pushed.
 - Data, artifacts, virtual environment, CLI binaries and compiled Bicep JSON
   are ignored by Git. They exist locally and need not be downloaded again.
 - The final documentation additions may be newer than the cloud bundle sync;
