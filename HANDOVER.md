@@ -1,36 +1,34 @@
 # SentinelOps — instructions for the next session
 
-Last updated: September 23, 2026 (medallion training continuation).
+Last updated: September 23, 2026 (batch operational ML continuation).
 
-## Latest continuation — incremental checks done; training reads Gold
+## Latest continuation — batch operational ML
 
-Read `docs/STATUS.md` (current milestone) and `docs/INGESTION.md` first.
-Pipeline `77ecd502-9283-4528-83e3-7ab8666ada1e`; jobs `cmapss_ingest`
-`264959928637120`, `cmapss_verify` `366011234786265`, new `cmapss_train`
-`477632929595835`. All are STANDARD, manual, one concurrent run, zero retries.
-Pipeline development mode must stay disabled via
-`targets.dev.presets.pipelines_development: false`.
+Read `docs/STATUS.md` (current milestone) and `docs/OPERATIONS.md` first.
+New jobs: `cmapss_promote` `714826690927619` and `cmapss_score`
+`362250970463849` (tasks score → monitor). Like the others, they are manual,
+STANDARD, one concurrent run, and zero retries.
 
 Verified on September 23, 2026:
-- The quality probe **is uploaded** and permanent: Bronze +9 lines, quarantine 5,
-  conflicts 1, canonical counts/features unchanged (runs `452160343690169`,
-  `205718877304121`). Do not upload it again or reset checkpoints.
-- A no-input rerun (`1108975989071922`) appended 0 rows; every materialized
-  view was planned NO_OP.
-- `cmapss_train` run `174998841420766` trained from Gold, logged Gold dataset
-  inputs/digests, registered **version 3** and moved `challenger` to it
-  (v2 kept, READY). v3 test RMSE 18.3415 vs v2 18.1586. The gap comes from
-  Spark vs pandas rolling-mean floating-point differences (<4e-12), reproduced
-  bit-for-bit offline. It is not a defect. Do not pick v2/v3 by test RMSE.
-- Twelve local tests pass. Evidence: `docs/medallion-probe-update.json`,
-  `docs/medallion-probe-verification.json`, `docs/medallion-rerun-update.json`,
-  `docs/medallion-training.json`.
+- The promotion gate (run `268300947742291`) promoted v3 to **`@champion`**.
+  Evidence: validation RMSE 14.9309 vs a recomputed constant baseline of
+  41.7208 on the same held-out engines (limit 0.5×). It read no test labels.
+  `@challenger` is now unset; the next `cmapss_train` run sets it again.
+- `cmapss_score` run `232258023004472` scored 13,096 fleet (test-split) rows
+  into `gold.cmapss_predictions` and merged delayed labels. Its endpoint RMSE
+  equals v3's test RMSE bit-for-bit. Raw PSI flags 26 of 43 features, because
+  fleet engines are younger; age-matched PSI flags 0. Rerun `94693603475272`
+  added nothing and reproduced identical metrics.
+- Twenty local tests pass.
 
-Costs: serverless wall-clock on September 23 was ~85 minutes including resource
-waits. Azure still posted only CAD 0.434912152 because billing is delayed.
-`system.billing` remains inaccessible (no privileges changed). Recheck posted
-costs on September 24 before new compute. Next: operational ML on the Gold
-contract (see STATUS "Scope still pending").
+Budget: a meter-level cost query shows serverless at about CAD 0.62/DBU,
+roughly 1.5 DBU per hour of job time. The managed resource group's NAT gateway
+and public IP cost ~CAD 1.7/day, always on. Projected September 23 total: CAD 3–4.
+
+Earlier on September 23: the quality probe (permanent in the landing volume)
+and the no-input rerun passed, and `cmapss_train` registered v3 from Gold.
+v3's test RMSE is 18.34 vs 18.16 for v2, from Spark vs pandas float
+differences. Do not upload the probe again; do not pick models by test RMSE.
 
 ## Objective and authorization
 
@@ -107,7 +105,7 @@ the normal approval mechanism; do not bypass controls or expose tokens.
 | MLflow run ID | `d4cb1f49d8444811999bbaa4dcccbfc0` |
 | Registered model | `sentinelops_dev.sentinelops_dev.turbofan_rul` |
 | Bootstrap model version | **2**, **READY**, no alias (was challenger) |
-| Gold-trained version / alias | **3**, **READY**, **challenger** (`cmapss_train` `477632929595835`, run `174998841420766`) |
+| Gold-trained version / alias | **3**, **READY**, **champion** (trained by `cmapss_train` run `174998841420766`; promoted by `cmapss_promote` run `268300947742291`) |
 
 The external location points to
 `abfss://metastore@stsent7s5fwynthfd64.dfs.core.windows.net/`.
@@ -136,8 +134,8 @@ Three managed Delta tables exist in `sentinelops_dev.sentinelops_dev`:
 - `gold_fd001_predictions`
 
 These are bootstrap batch overwrites. The new medallion tables are separate from
-these original tables; see the latest continuation above. The prediction table contains benchmark test outputs;
-it is not a production batch-scoring workflow for new fleet observations.
+these original tables; see the latest continuation above. That bootstrap prediction table holds
+benchmark test outputs only; fleet batch scoring writes `gold.cmapss_predictions` (docs/OPERATIONS.md).
 
 Verified cloud and local metrics match exactly:
 
@@ -222,9 +220,10 @@ zero application retries, 900-second timeout, and no recurring schedule.
 2. **Operational ML:** implement scoring of new observations, serving with a
    defined feature/history contract, inference logging, monitoring with delayed
    ground truth, and validation-based champion/challenger promotion/retraining.
-   Compute scoring features with the same Spark logic as Gold, not pandas: the
-   model is sensitive to their ~1e-12 differences. There is currently no
-   champion alias, serving endpoint or monitoring setup.
+   Batch scoring, delayed-label monitoring and the promotion gate are done
+   (docs/OPERATIONS.md). Remaining: a bounded serving demo using Gold-format
+   features (never pandas-recomputed features), orchestrated retraining, and
+   alerts. No serving endpoint exists.
 3. **Safety RAG:** verify/download OSHA sources, record provenance and license,
    handle unnecessary personal/address data, build chunks and retrieval, add
    grounded answers with citations/abstention, tracing/evaluations and structured

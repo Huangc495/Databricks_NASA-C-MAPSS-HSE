@@ -53,3 +53,81 @@ resources:
       environments:
         - environment_key: ml
           spec: *ml_environment
+    # Validation-gated @challenger -> @champion. Never reads official test labels.
+    # The challenger must at least halve the constant baseline's validation RMSE and
+    # match or beat a comparable champion.
+    cmapss_promote:
+      name: sentinelops-cmapss-promote
+      max_concurrent_runs: 1
+      timeout_seconds: 600
+      performance_target: STANDARD
+      tasks:
+        - task_key: promote
+          max_retries: 0
+          timeout_seconds: 600
+          spark_python_task:
+            python_file: ../jobs/promote.py
+            parameters:
+              - --catalog
+              - ${var.catalog}
+              - --schema
+              - ${var.schema}
+              - --max-baseline-ratio
+              - '0.5'
+              - --tolerance
+              - '0.0'
+              - --source-root
+              - ${workspace.file_path}/src
+          environment_key: ml
+      environments:
+        - environment_key: ml
+          spec: *ml_environment
+    # @champion scores fleet observations into gold.cmapss_predictions, then monitoring
+    # merges delayed labels and appends performance and drift snapshots. Manual only.
+    cmapss_score:
+      name: sentinelops-cmapss-score
+      max_concurrent_runs: 1
+      timeout_seconds: 1200
+      performance_target: STANDARD
+      tasks:
+        - task_key: score
+          max_retries: 0
+          timeout_seconds: 600
+          spark_python_task:
+            python_file: ../jobs/score_fleet.py
+            parameters:
+              - --catalog
+              - ${var.catalog}
+              - --schema
+              - ${var.schema}
+              - --subset
+              - FD001
+              - --fleet-split
+              - test
+              - --job-run-id
+              - '{{job.run_id}}'
+              - --source-root
+              - ${workspace.file_path}/src
+          environment_key: ml
+        - task_key: monitor
+          depends_on:
+            - task_key: score
+          max_retries: 0
+          timeout_seconds: 600
+          spark_python_task:
+            python_file: ../jobs/monitor_fleet.py
+            parameters:
+              - --catalog
+              - ${var.catalog}
+              - --subset
+              - FD001
+              - --fleet-split
+              - test
+              - --job-run-id
+              - '{{job.run_id}}'
+              - --source-root
+              - ${workspace.file_path}/src
+          environment_key: ml
+      environments:
+        - environment_key: ml
+          spec: *ml_environment

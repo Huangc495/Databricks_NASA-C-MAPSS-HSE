@@ -85,8 +85,11 @@ this timeout reduces exposure but is not a hard billing cap.
 
 ## Next milestones
 
-1. Add batch scoring and serving on Spark-computed Gold features, inference
-   logging, labeled monitoring and validation-gated champion promotion.
+1. Real-time serving demo, orchestrated retraining (ingest → verify → train →
+   promote), and alerts on drift/performance. Batch operations are already in
+   place: validation-gated promotion (v3 is `@champion`), idempotent fleet
+   scoring into `gold.cmapss_predictions`, and delayed-label performance plus
+   age-matched drift monitoring. See [docs/OPERATIONS.md](docs/OPERATIONS.md).
 2. Extend training beyond FD001 using the existing composite keys.
 3. Add OSHA ingestion, retrieval, grounded generation and evaluation.
 4. Add Event Hubs/API sources, dashboard/Genie and OIDC staging/production CI/CD.

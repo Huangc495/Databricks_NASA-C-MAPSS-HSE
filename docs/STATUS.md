@@ -2,7 +2,44 @@
 
 Last verified: September 23, 2026.
 
-## Current milestone: incremental checks passed; training consumes Gold
+## Current milestone: batch operational ML (promote, score, monitor)
+
+A champion now scores the simulated fleet into an idempotent inference log.
+Delayed labels are merged, and performance and drift snapshots are recorded.
+See [OPERATIONS.md](OPERATIONS.md) for the design. No Azure resources were created.
+
+- **Promotion gate:** job `cmapss_promote` (`714826690927619`), run
+  `268300947742291` **SUCCESS**. v3 passed every gate: Gold lineage, feature
+  signature, and label digest unchanged. Validation RMSE **14.9309** vs a
+  constant baseline of **41.7208** on the same 20 held-out engines (ratio 0.358;
+  the limit is 0.5). No official test labels were read. **`@champion` → v3**;
+  `@challenger` removed; v3 tagged `promotion_decision=promoted`. Confirmed
+  independently via the UC API. Evidence: [promotion-decision.json](promotion-decision.json).
+- **Fleet scoring + monitoring:** job `cmapss_score` (`362250970463849`), run
+  `232258023004472` **SUCCESS** (9.3 min, both tasks). Scored **13,096** fleet
+  (test-split) observations into `gold.cmapss_predictions`, then merged 13,096
+  delayed labels. Endpoint-segment RMSE is **18.341479192292436**, bit-identical
+  to v3's training-run test RMSE. That confirms scoring uses exactly the
+  evaluated model and features. Other segments: true RUL ≤ 125, RMSE 19.17
+  (bias +5.1); true RUL > 125, bias −60, expected from the 125-cycle label cap.
+  Drift: raw PSI > 0.2 for 26 of 43 features, **0 of 43** after age matching
+  (max 0.102). Raw PSI mainly reflects younger fleet engines, not sensor drift.
+  Evidence: [fleet-scoring-first-run.json](fleet-scoring-first-run.json).
+- **Idempotent rerun:** run `94693603475272` **SUCCESS** (7.3 min). 0 pending
+  rows, no scoring merge, 0 labels updated, the log still has 13,096 rows for
+  v3, and performance and drift values are identical to the first run. Each run
+  appends one snapshot to the performance and drift tables by design.
+  Evidence: [fleet-scoring-rerun.json](fleet-scoring-rerun.json).
+- All values match a local rehearsal on real FD001 data with Spark-emulated
+  features, run before any cloud compute.
+- Twenty local tests pass (eight new: gate, baseline, label digest, performance
+  segments, PSI, age matching). The age-matching test caught an open-ended bin
+  bug before deployment. Strict validation passed; deploy created only
+  `cmapss_promote` and `cmapss_score`.
+- Not done: no real-time serving endpoint or inference tables; no schedules
+  or alerts; no Lakehouse Monitoring monitor (metrics are computed by the job).
+
+## Previous milestone: incremental checks passed; training consumes Gold
 
 All outstanding medallion checks have run in the cloud, and training now reads
 the Gold tables. No Azure resources were created; one bundle job was added.
@@ -53,7 +90,7 @@ the Gold tables. No Azure resources were created; one bundle job was added.
 - Final inventory: pipeline **IDLE**, no active runs, no classic clusters,
   starter warehouse **STOPPED**, no custom serving endpoints.
 
-## Previous milestone: medallion ingestion and feature parity verified
+## Earlier milestone: medallion ingestion and feature parity verified
 
 - Added `pipelines/medallion.py`: raw TEXT/JSON Auto Loader, quality expectations,
   malformed-row quarantine, conflicting-key exclusion, numeric deduplication,
@@ -161,12 +198,14 @@ completion of the full SentinelOps platform.
 
 ## Scope still pending
 
-1. Operational ML on the Gold contract: batch scoring of new observations from
-   Spark-computed features (not pandas, given the numerical sensitivity above),
-   serving with a defined history contract, inference logging, monitoring with
-   delayed labels, and promotion gated on fresh validation data, never on the
-   fixed official test set. No champion alias exists yet. Consider orchestrating
-   ingest → verify → train as one job to avoid concurrent Gold reads.
+1. Finish operational ML:
+   - a bounded real-time serving demo on Gold-format features (endpoint deleted
+     afterwards);
+   - an orchestrated retraining job (ingest → verify → train → promote), which
+     also avoids concurrent Gold reads;
+   - alert thresholds on the age-matched drift and labelled-performance tables;
+   - optionally, a Lakehouse Monitoring inference profile on `gold.cmapss_predictions`.
+
    Additional external locations are deferred until needed.
 2. Extend beyond FD001 (FD002–FD004 need operating-condition handling); the
    `(dataset, subset, split, unit, cycle)` keys and `--subset` parameter support it.
@@ -190,6 +229,19 @@ completion of the full SentinelOps platform.
   afterwards, which reflects billing delay rather than actual usage. The
   project has never had a usage view that confirms the daily total; an
   account/metastore admin granting read access to `system.billing` would fix that.
+- By 17:15 UTC, cost posted for September 23 had reached **CAD 1.02**; a query
+  grouped by meter covered usage up to about 08:00 UTC:
+  - serverless compute: 0.687 DBU = CAD 0.43, about **CAD 0.62/DBU**, roughly
+    1.5 DBU per hour of job wall-clock;
+  - **a NAT gateway and a static public IP in the managed resource group bill
+    24/7**, about CAD 0.07/hour, or **~CAD 1.7/day even with no compute**. They
+    come from the workspace's secure-cluster-connectivity networking, which only
+    classic compute uses; serverless does not use them. Keep this fixed cost in
+    the daily budget;
+  - storage and bandwidth are negligible.
+- The operational-ML milestone added ~25 minutes of serverless wall-clock
+  (promote 6.4, score+monitor 9.3, idempotency rerun 7.3). Projected September 23
+  total: roughly CAD 3–4, under the $10/day limit.
 
 The local benchmark demonstrates predictive performance on simulated engines.
 It is not evidence of reduced real-world downtime or an operational safety system.

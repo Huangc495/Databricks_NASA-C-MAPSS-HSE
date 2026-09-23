@@ -1,0 +1,89 @@
+{
+  "job_id": 362250970463849,
+  "run_id": 94693603475272,
+  "result": "SUCCESS",
+  "score": {
+    "model": "sentinelops_dev.sentinelops_dev.turbofan_rul",
+    "champion_version": 3,
+    "champion_run": "02b4dd86f955493ab75c6a53ef685e3f",
+    "subset": "FD001",
+    "fleet_split": "test",
+    "fleet_rows": 13096,
+    "pending_rows": 0,
+    "merge": null,
+    "logged_rows_for_version": 13096
+  },
+  "monitor": {
+    "labels_merge": {
+      "num_affected_rows": 0,
+      "num_updated_rows": 0,
+      "num_deleted_rows": 0,
+      "num_inserted_rows": 0
+    },
+    "labelled_rows": 13096,
+    "performance": [
+      {
+        "model_version": 3,
+        "segment": "all",
+        "rows": 13096,
+        "rmse": 57.19709778802868,
+        "mae": 42.14321755242016,
+        "nasa_score": 392387845.2347783,
+        "bias": -34.47031047785411,
+        "model_name": "sentinelops_dev.sentinelops_dev.turbofan_rul"
+      },
+      {
+        "model_version": 3,
+        "segment": "endpoint",
+        "rows": 100,
+        "rmse": 18.341479192292436,
+        "mae": 13.170106535258657,
+        "nasa_score": 650.8058772165779,
+        "bias": 0.18899340111113547,
+        "model_name": "sentinelops_dev.sentinelops_dev.turbofan_rul"
+      },
+      {
+        "model_version": 3,
+        "segment": "actual_le_125",
+        "rows": 5144,
+        "rmse": 19.174899577687704,
+        "mae": 14.418936356249889,
+        "nasa_score": 55927.587567265684,
+        "bias": 5.115111381699773,
+        "model_name": "sentinelops_dev.sentinelops_dev.turbofan_rul"
+      }
+    ],
+    "drift_features_over_0_2": {
+      "raw": 26,
+      "age_matched": 0,
+      "of": 43
+    },
+    "top_drift": [
+      {
+        "feature": "sensor_17_mean_10",
+        "psi": 0.4414393591841031,
+        "psi_age_matched": 0.10245821119714565
+      },
+      {
+        "feature": "sensor_9_mean_10",
+        "psi": 0.2761239012593325,
+        "psi_age_matched": 0.09918125916645391
+      },
+      {
+        "feature": "sensor_21_mean_10",
+        "psi": 0.4257869354851267,
+        "psi_age_matched": 0.09778344648100222
+      },
+      {
+        "feature": "sensor_4_mean_10",
+        "psi": 0.4314899037622779,
+        "psi_age_matched": 0.09624252828944811
+      },
+      {
+        "feature": "sensor_3_mean_10",
+        "psi": 0.43527612347251354,
+        "psi_age_matched": 0.0946525424491221
+      }
+    ]
+  }
+}

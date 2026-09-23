@@ -29,6 +29,12 @@ def training_frame(features: pd.DataFrame, labels: pd.DataFrame, subset: str) ->
     return joined.sort_values(["unit", "cycle"]).reset_index(drop=True).astype({"cycle": "int64"})
 
 
+def label_frame(labels: pd.DataFrame, subset: str) -> pd.DataFrame:
+    """Training labels in the row order and dtypes that training_frame() produces."""
+    y = _one_subset(labels, subset, "train", KEYS)
+    return y.sort_values(["unit", "cycle"]).reset_index(drop=True).astype({"cycle": "int64"})
+
+
 def endpoint_frame(endpoints: pd.DataFrame, subset: str) -> pd.DataFrame:
     """One official, uncapped label per test engine at its last observed cycle."""
     test = _one_subset(endpoints, subset, "test", ENGINE)

@@ -81,11 +81,13 @@ reference for local tests and the bootstrap.
 
 ## Full-platform work still required
 
-Training now consumes the medallion Gold tables; model promotion does not yet
-exist. Additional external locations are deferred until a source needs access outside the existing
-managed volume. Serving and monitoring need timestamped inference
-records with delayed labels, plus challenger comparison on fresh validation data.
-Do not repeatedly tune against the fixed official test set.
+Training consumes the Gold tables. A validation-gated promotion job,
+idempotent fleet batch scoring into a timestamped inference log, and
+delayed-label monitoring are in place (see [OPERATIONS.md](OPERATIONS.md)).
+Still missing: real-time serving, orchestrated retraining, and alerting.
+Additional external locations are deferred until a source needs access outside
+the existing managed volume. Do not repeatedly tune against the fixed official
+test set; the fleet monitoring metrics reuse those engines.
 
 Safety RAG is a separate delivery milestone: acquire OSHA data with provenance,
 remove unnecessary personal/employer/address details, preserve source citations,
