@@ -95,8 +95,13 @@ this timeout reduces exposure but is not a hard billing cap.
    privacy-minimized landing, the `osha_safety` pipeline to Gold (105,993
    documents), Qwen3 embeddings for all of them via `ai_query`, and exact
    retrieval evaluated on OSHA-code relevance: dense precision@10 0.88 vs 0.79
-   for TF-IDF, with 256 dimensions matching 1,024. Next: cited answers and
-   their evaluation.
+   for TF-IDF, with 256 dimensions matching 1,024. Grounded answers from
+   GPT-OSS-120B cite report IDs, which code checks, and decline when the
+   reports can't answer. The manual job `osha_answer_eval` traces every
+   question in MLflow. On 28 held-out questions it made 28/28 correct
+   answer/decline decisions; a Llama 3.3 judge passed 11/12 answers for
+   correctness and 12/12 for groundedness. Next: structured extraction
+   scored against OSHA codes.
    See [docs/SAFETY_RAG.md](docs/SAFETY_RAG.md). Data courtesy of the U.S.
    Department of Labor (OSHA); no endorsement implied.
 4. Add Event Hubs/API sources, dashboard/Genie and OIDC staging/production CI/CD.

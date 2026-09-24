@@ -1,0 +1,618 @@
+{
+  "job_id": 1029765841933443,
+  "run_id": 745084593826476,
+  "result": "SUCCESS",
+  "run_minutes": {
+    "setup": 3.1,
+    "execution": 5.0,
+    "total": 8.1
+  },
+  "mlflow_run_id": "17406be7875d4a2387785faf3ea9f083",
+  "eval_fingerprint": "5de856ec9f5e",
+  "prompt_version": "osha-answer-prompt-v3",
+  "documents": 105993,
+  "index_mb": 103.5,
+  "calibration": {
+    "threshold": 0.6511,
+    "rule": "midpoint of min on-topic and max off-topic top-1 cosine",
+    "on_topic": {
+      "questions": 34,
+      "min": 0.7095,
+      "median": 0.7612
+    },
+    "off_topic": {
+      "questions": 6,
+      "max": 0.5927
+    },
+    "dev_unanswerable": {
+      "questions": 8,
+      "min": 0.619,
+      "max": 0.762,
+      "below_threshold": 1
+    }
+  },
+  "summary": {
+    "answerable": {
+      "questions": 12,
+      "status_counts": {
+        "answered": 12
+      },
+      "decision_accuracy": 1.0,
+      "wrong_decisions": [],
+      "draft_citation_valid_rate": 1.0,
+      "mean_citation_coverage": 1.0,
+      "correctness_pass_rate": 0.9166666666666666,
+      "correctness_scored": 12,
+      "relevance_to_query_pass_rate": 1.0,
+      "relevance_to_query_scored": 12,
+      "retrieval_groundedness_pass_rate": 1.0,
+      "retrieval_groundedness_scored": 12
+    },
+    "unanswerable": {
+      "questions": 11,
+      "status_counts": {
+        "declined_low_similarity": 5,
+        "declined_insufficient_evidence": 6
+      },
+      "decision_accuracy": 1.0,
+      "wrong_decisions": [],
+      "correctness_pass_rate": 1.0,
+      "correctness_scored": 11,
+      "relevance_to_query_pass_rate": 0.36363636363636365,
+      "relevance_to_query_scored": 11,
+      "retrieval_groundedness_pass_rate": 0.09090909090909091,
+      "retrieval_groundedness_scored": 11
+    },
+    "off_topic": {
+      "questions": 5,
+      "status_counts": {
+        "declined_low_similarity": 5
+      },
+      "decision_accuracy": 1.0,
+      "wrong_decisions": [],
+      "correctness_pass_rate": 1.0,
+      "correctness_scored": 5,
+      "relevance_to_query_pass_rate": 0.0,
+      "relevance_to_query_scored": 5,
+      "retrieval_groundedness_pass_rate": 0.2,
+      "retrieval_groundedness_scored": 5
+    },
+    "overall": {
+      "questions": 28,
+      "decision_accuracy": 1.0,
+      "input_tokens": 24036,
+      "output_tokens": 2792
+    }
+  },
+  "generation_dbus": 0.07544,
+  "seconds": {
+    "index_load": 130.5,
+    "evaluate": 113.1,
+    "total": 252.4
+  },
+  "per_question": [
+    {
+      "question_id": "ammonia_leak",
+      "category": "answerable",
+      "status": "answered",
+      "top1_score": 0.7417,
+      "judges": {
+        "correctness": "yes",
+        "retrieval_groundedness": "yes",
+        "relevance_to_query": "yes"
+      },
+      "answer": "In these reports, employees exposed to ammonia leaks suffered breathing and swallowing difficulties, eye blurriness, and lung injuries [2036538]. Some also experienced chemical burns, respiratory illness, and loss of consciousness, leading to hospitalization [1017209][2115614][1735357]. One incident described a spray to the face causing inhalation injury and required hospital care [1217879]. Another report noted inhalation injury to the lungs and eyes after a valve release [2146208].",
+      "trace_id": "tr-44812066edb3a09d092fbedc81e8a93f",
+      "cited_ids": [
+        1017209,
+        1217879,
+        1735357,
+        2036538,
+        2115614,
+        2146208
+      ],
+      "coverage": 1.0
+    },
+    {
+      "question_id": "arc_flash",
+      "category": "answerable",
+      "status": "answered",
+      "top1_score": 0.7549,
+      "judges": {
+        "correctness": "yes",
+        "retrieval_groundedness": "yes",
+        "relevance_to_query": "yes"
+      },
+      "answer": "In these reports, arc flash injuries occur when workers are performing tasks that expose them to energized equipment, such as working on battery storage units, unblocking meters, replacing pins or switches, testing breakers, installing grounds, or measuring high‑voltage phases, and an unexpected release of electrical energy creates a flash and blast [2287650][2132092][2309247][2203564][2168917][2171094][2277419][2161074]. The injuries are caused by intense heat and pressure from the arc, resulting in burns to the face, head, arms, hands, torso, legs, or other body parts, sometimes accompanied by additional trauma like a dislocated shoulder [2287650][2132092][2309247][2203564][2168917][2171094][2277419][2161074]. Lack of proper lockout/tagout, loss of power unexpectedly, or insufficient personal protective equipment can allow the arc flash to occur and cause severe burns [2203564][2161074].",
+      "trace_id": "tr-daea07bf9d005ef229e2ec18bd83de90",
+      "cited_ids": [
+        2132092,
+        2161074,
+        2168917,
+        2171094,
+        2203564,
+        2277419,
+        2287650,
+        2309247
+      ],
+      "coverage": 1.0
+    },
+    {
+      "question_id": "baler_compactor",
+      "category": "answerable",
+      "status": "answered",
+      "top1_score": 0.7656,
+      "judges": {
+        "correctness": "yes",
+        "retrieval_groundedness": "yes",
+        "relevance_to_query": "yes"
+      },
+      "answer": "In these reports, workers are injured when balers or compactors close or activate while a hand, arm, or leg is in the machine, causing crushing, fractures, or amputations [2224477][2040030][1327491][1344250][1006211]. Injuries also occur when a worker is cleaning or clearing material and the equipment moves unexpectedly, such as a baler door or conveyor falling onto the employee, resulting in severe trauma to the body [2094540]. Additionally, a compactor can fail structurally, breaking anchor bolts and trapping a worker between the machine and a wall, leading to pelvic and internal injuries [963284].",
+      "trace_id": "tr-fd3090bc887be9028a7c2e15a36574cb",
+      "cited_ids": [
+        963284,
+        1006211,
+        1327491,
+        1344250,
+        2040030,
+        2094540,
+        2224477
+      ],
+      "coverage": 1.0
+    },
+    {
+      "question_id": "conveyor_caught",
+      "category": "answerable",
+      "status": "answered",
+      "top1_score": 0.7879,
+      "judges": {
+        "correctness": "no",
+        "retrieval_groundedness": "yes",
+        "relevance_to_query": "yes"
+      },
+      "answer": "Workers are injured when they climb onto or stand on moving belts or rollers and the equipment is re‑energized, causing hands, arms or fingers to be crushed between rollers or pulled into tension rollers [971570][1919895][1878718].  Injuries also occur when workers are positioned on the belt or near pulleys during cleaning or maintenance and the belt starts unexpectedly, pulling them under pulleys or into rotating parts and resulting in broken bones, chest injuries or limb fractures [1917941][1389723][1325674].  Additionally, a worker cleaning a feed conveyor slipped and the belt tipped over onto them, causing severe trauma to the torso and internal injuries [2142122].",
+      "trace_id": "tr-4b4f2ab3f2aad72f8aa3659e2f248025",
+      "cited_ids": [
+        971570,
+        1325674,
+        1389723,
+        1878718,
+        1917941,
+        1919895,
+        2142122
+      ],
+      "coverage": 1.0
+    },
+    {
+      "question_id": "fryer_burn",
+      "category": "answerable",
+      "status": "answered",
+      "top1_score": 0.7259,
+      "judges": {
+        "correctness": "yes",
+        "retrieval_groundedness": "yes",
+        "relevance_to_query": "yes"
+      },
+      "answer": "In these reports, workers were burned when hot oil splashed or spilled onto them after a fryer exploded or a pressure‑cooker lid failed, causing oil to eject at high temperature [1901818][1176396]. Workers also fell into or onto hot oil while cleaning, retrieving filters, or standing on active fryers, resulting in burns to legs, arms, or hands [1991684][1181719][1309577][1156951]. Slipping on the floor or a loose drain cover caused fryers to tip or drop, spilling hot oil onto the employee’s body or clothing [1018059][1991684]. Lighting a propane‑fuel deep fryer exposed the employee to a flash fire that burned the face and arms [2166303].",
+      "trace_id": "tr-f0b1978a29dc608b5a9e67ef094c26e4",
+      "cited_ids": [
+        1018059,
+        1156951,
+        1176396,
+        1181719,
+        1309577,
+        1901818,
+        1991684,
+        2166303
+      ],
+      "coverage": 1.0
+    },
+    {
+      "question_id": "grain_engulfment",
+      "category": "answerable",
+      "status": "answered",
+      "top1_score": 0.7214,
+      "judges": {
+        "correctness": "yes",
+        "retrieval_groundedness": "yes",
+        "relevance_to_query": "yes"
+      },
+      "answer": "In the report of an engulfment, a temporary employee cleaning a grain bin was buried by grain up to chest height, experienced breathing difficulties, and required hospitalization for those respiratory problems[1488237].",
+      "trace_id": "tr-595576cd446807ff3006204c13ec74cc",
+      "cited_ids": [
+        1488237
+      ],
+      "coverage": 1.0
+    },
+    {
+      "question_id": "heat_illness",
+      "category": "answerable",
+      "status": "answered",
+      "top1_score": 0.7523,
+      "judges": {
+        "correctness": "yes",
+        "retrieval_groundedness": "yes",
+        "relevance_to_query": "yes"
+      },
+      "answer": "In these reports, heat‑related hospitalizations occurred while employees operated heavy industrial equipment such as an excursion press for a press saw and monitored ladles in metal‑working processes [1906877][1475021]. They also happened to workers delivering packages outdoors in high heat and humidity [2324395][2311839]. Hospitalizations were reported for an apprentice lineman working on utility lines [2092036] and for personnel involved in molten aluminum production [1498649]. Additional cases involved workers performing unspecified tasks in environments with extreme heat, such as during night‑shift operations in manufacturing settings [2301479][1130403].",
+      "trace_id": "tr-d9ece3c2d47fc4d9337898da3d0d4035",
+      "cited_ids": [
+        1130403,
+        1475021,
+        1498649,
+        1906877,
+        2092036,
+        2301479,
+        2311839,
+        2324395
+      ],
+      "coverage": 1.0
+    },
+    {
+      "question_id": "ladder_fall",
+      "category": "answerable",
+      "status": "answered",
+      "top1_score": 0.7751,
+      "judges": {
+        "correctness": "yes",
+        "retrieval_groundedness": "yes",
+        "relevance_to_query": "yes"
+      },
+      "answer": "In these reports, workers who fall from ladders commonly sustain multiple fractures, often to the wrist, ribs, vertebrae, or other bones [2229899][2112351][2156069][1176841][1230386][1239546][1222551][1516355].  \nThey may also experience serious internal injuries such as lung bruising, spleen lacerations, abdominal bleeding, or organ damage [2156069][1222551].  \nHead injuries, including contusions, lacerations, or skull wounds, are reported when the fall impacts the side or head [2156069].  \nFalls frequently result in hospitalization for treatment of these injuries [2156069][1222551][1239546].  \nThe severity of injuries varies with fall height, but even falls of 8 feet can cause spinal fractures and multiple broken ribs [2229899][2112351].",
+      "trace_id": "tr-dc75277169a52d671cafc7d8fec8a860",
+      "cited_ids": [
+        1176841,
+        1222551,
+        1230386,
+        1239546,
+        1516355,
+        2112351,
+        2156069,
+        2229899
+      ],
+      "coverage": 1.0
+    },
+    {
+      "question_id": "livestock",
+      "category": "answerable",
+      "status": "answered",
+      "top1_score": 0.7691,
+      "judges": {
+        "correctness": "yes",
+        "retrieval_groundedness": "yes",
+        "relevance_to_query": "yes"
+      },
+      "answer": "In these reports, farm workers were injured when cattle or horses moved unexpectedly, stepped on, trampled, or struck them, often while herding, sorting, or transporting animals [1072088][1205258][1133223][2205109][1595137][1549072][1351793][1983218]. Injuries commonly included broken ribs, pelvis, hips, skull fractures, facial fractures, and contusions, as well as internal injuries such as punctured lungs and concussions [1072088][1205258][1133223][1595137][1549072][1351793][1983218]. The incidents occurred during activities like moving cattle to a kill floor, driving cattle in a ring, sorting heifers, pushing cattle in pens, transferring cattle to a corral, and riding a horse through a herd [1072088][1133223][2205109][1549072][1351793][1983218].",
+      "trace_id": "tr-2e2a53738f2c6860f306b69fc43c9f13",
+      "cited_ids": [
+        1072088,
+        1133223,
+        1205258,
+        1351793,
+        1549072,
+        1595137,
+        1983218,
+        2205109
+      ],
+      "coverage": 1.0
+    },
+    {
+      "question_id": "skid_steer",
+      "category": "answerable",
+      "status": "answered",
+      "top1_score": 0.8412,
+      "judges": {
+        "correctness": "yes",
+        "retrieval_groundedness": "yes",
+        "relevance_to_query": "yes"
+      },
+      "answer": "In these reports, workers are injured when a skid‑steer loader tips or overturns, pinning or crushing their legs or feet [1355280][983085][1901366][986311]. They are also injured when the loader moves unexpectedly—lunging forward, starting while a lever is engaged, or rolling forward—causing falls, ankle fractures, or leg strikes [1896641][2018471]. Injuries occur from being struck by rotating or swinging parts such as the bucket, which can hit the chest or other body areas [1440527]. Falls from the loader or while working on it can result in head injuries or other traumatic injuries [2220864].",
+      "trace_id": "tr-409257a46f03a01c64e3624aab0dc2ec",
+      "cited_ids": [
+        983085,
+        986311,
+        1355280,
+        1440527,
+        1896641,
+        1901366,
+        2018471,
+        2220864
+      ],
+      "coverage": 1.0
+    },
+    {
+      "question_id": "trench_collapse",
+      "category": "answerable",
+      "status": "answered",
+      "top1_score": 0.8221,
+      "judges": {
+        "correctness": "yes",
+        "retrieval_groundedness": "yes",
+        "relevance_to_query": "yes"
+      },
+      "answer": "In these reports, workers trapped by a trench collapse are often pinned or engulfed by soil, leading to severe injuries such as fractured ribs, vertebrae, pelvis, femur, or facial bones, and internal injuries like bruised bladders or abdominal trauma [2223901][1852287][2282937][2208427][2152123][2193189][2328832][2240345]. Some workers are hospitalized for multiple broken bones or internal injuries, while others receive treatment without hospitalization if injuries are less severe [2193189]. The collapse can also cause workers to fall into adjacent spaces, such as a manhole box, resulting in additional injuries like dislocated shoulders [2328832].",
+      "trace_id": "tr-125dd34c91d10f4ffe06fcc9eb50fae3",
+      "cited_ids": [
+        1852287,
+        2152123,
+        2193189,
+        2208427,
+        2223901,
+        2240345,
+        2282937,
+        2328832
+      ],
+      "coverage": 1.0
+    },
+    {
+      "question_id": "wood_chipper",
+      "category": "answerable",
+      "status": "answered",
+      "top1_score": 0.7166,
+      "judges": {
+        "correctness": "yes",
+        "retrieval_groundedness": "yes",
+        "relevance_to_query": "yes"
+      },
+      "answer": "In these reports, workers have suffered head trauma and facial fractures when a wood slab on a chipper’s conveyor struck them while sweeping debris [1734715]. Workers have lost fingers or parts of fingers when logs or debris were kicked upward or caught in feed wheels or conveyors during feeding or housekeeping operations [1872241][1324665][1719905]. Hands and thumbs have been severed or severely lacerated when caught in drive belts or other moving parts during testing, troubleshooting, or maintenance [1358674]. Legs and lower limbs have been caught and amputated, including a leg amputation up to the knee and toe amputations, when workers were feeding brush or cleaning the drum and duct of the chipper [1716652][2031134]. Arms have been pulled into the chipper and amputated at the elbow while attempting to stop belt slip [1832891].",
+      "trace_id": "tr-852a1e5168e75db276935296c6ebbc00",
+      "cited_ids": [
+        1324665,
+        1358674,
+        1716652,
+        1719905,
+        1734715,
+        1832891,
+        1872241,
+        2031134
+      ],
+      "coverage": 1.0
+    },
+    {
+      "question_id": "autumn_poem",
+      "category": "off_topic",
+      "status": "declined_low_similarity",
+      "top1_score": 0.485,
+      "judges": {
+        "correctness": "yes",
+        "retrieval_groundedness": "no",
+        "relevance_to_query": "no"
+      },
+      "answer": "I can't answer that from the OSHA severe injury reports: none of them is close enough to the question.",
+      "trace_id": "tr-760a11ad23fcd7fa055328dcba59a0c3",
+      "cited_ids": null,
+      "coverage": null
+    },
+    {
+      "question_id": "developer_mode",
+      "category": "off_topic",
+      "status": "declined_low_similarity",
+      "top1_score": 0.5794,
+      "judges": {
+        "correctness": "yes",
+        "retrieval_groundedness": "no",
+        "relevance_to_query": "no"
+      },
+      "answer": "I can't answer that from the OSHA severe injury reports: none of them is close enough to the question.",
+      "trace_id": "tr-5cdd833fd147536cdc67dadee4a20a95",
+      "cited_ids": null,
+      "coverage": null
+    },
+    {
+      "question_id": "gaming_laptop",
+      "category": "off_topic",
+      "status": "declined_low_similarity",
+      "top1_score": 0.3752,
+      "judges": {
+        "correctness": "yes",
+        "retrieval_groundedness": "yes",
+        "relevance_to_query": "no"
+      },
+      "answer": "I can't answer that from the OSHA severe injury reports: none of them is close enough to the question.",
+      "trace_id": "tr-a51a4437ff0b3044de857e08d21d5cbc",
+      "cited_ids": null,
+      "coverage": null
+    },
+    {
+      "question_id": "sourdough",
+      "category": "off_topic",
+      "status": "declined_low_similarity",
+      "top1_score": 0.4865,
+      "judges": {
+        "correctness": "yes",
+        "retrieval_groundedness": "no",
+        "relevance_to_query": "no"
+      },
+      "answer": "I can't answer that from the OSHA severe injury reports: none of them is close enough to the question.",
+      "trace_id": "tr-097c0feafa3eda163b60dfb7d71cf037",
+      "cited_ids": null,
+      "coverage": null
+    },
+    {
+      "question_id": "world_cup",
+      "category": "off_topic",
+      "status": "declined_low_similarity",
+      "top1_score": 0.4579,
+      "judges": {
+        "correctness": "yes",
+        "retrieval_groundedness": "no",
+        "relevance_to_query": "no"
+      },
+      "answer": "I can't answer that from the OSHA severe injury reports: none of them is close enough to the question.",
+      "trace_id": "tr-b31c73516f7298ae7f91d20b4b040b9b",
+      "cited_ids": null,
+      "coverage": null
+    },
+    {
+      "question_id": "acme_record",
+      "category": "unanswerable",
+      "status": "declined_low_similarity",
+      "top1_score": 0.6495,
+      "judges": {
+        "correctness": "yes",
+        "retrieval_groundedness": "no",
+        "relevance_to_query": "no"
+      },
+      "answer": "I can't answer that from the OSHA severe injury reports: none of them is close enough to the question.",
+      "trace_id": "tr-d348680c253826f5db8f3d544a5dbfe6",
+      "cited_ids": null,
+      "coverage": null
+    },
+    {
+      "question_id": "chemical_burn_first_aid",
+      "category": "unanswerable",
+      "status": "declined_insufficient_evidence",
+      "top1_score": 0.687,
+      "judges": {
+        "correctness": "yes",
+        "retrieval_groundedness": "no",
+        "relevance_to_query": "no"
+      },
+      "answer": "I can't answer that from the OSHA severe injury reports. The reports describe incidents and injuries but do not provide information on the specific first‑aid steps to treat severe chemical burns.",
+      "trace_id": "tr-59f3b1c6d72326aafebc186c95e1f40e",
+      "cited_ids": null,
+      "coverage": null
+    },
+    {
+      "question_id": "finger_compensation",
+      "category": "unanswerable",
+      "status": "declined_insufficient_evidence",
+      "top1_score": 0.6818,
+      "judges": {
+        "correctness": "yes",
+        "retrieval_groundedness": "no",
+        "relevance_to_query": "no"
+      },
+      "answer": "I can't answer that from the OSHA severe injury reports. The reports do not contain any information about workers' compensation amounts or benefits for finger loss.",
+      "trace_id": "tr-9242db5ec4fcabed503c31e6bfb2b254",
+      "cited_ids": null,
+      "coverage": null
+    },
+    {
+      "question_id": "future_rules",
+      "category": "unanswerable",
+      "status": "declined_low_similarity",
+      "top1_score": 0.4757,
+      "judges": {
+        "correctness": "yes",
+        "retrieval_groundedness": "no",
+        "relevance_to_query": "no"
+      },
+      "answer": "I can't answer that from the OSHA severe injury reports: none of them is close enough to the question.",
+      "trace_id": "tr-2d3f835d3f1a14a09c29ca12beecc6be",
+      "cited_ids": null,
+      "coverage": null
+    },
+    {
+      "question_id": "grain_fine",
+      "category": "unanswerable",
+      "status": "declined_low_similarity",
+      "top1_score": 0.5986,
+      "judges": {
+        "correctness": "yes",
+        "retrieval_groundedness": "no",
+        "relevance_to_query": "no"
+      },
+      "answer": "I can't answer that from the OSHA severe injury reports: none of them is close enough to the question.",
+      "trace_id": "tr-6e9fc87288898497341e86ce8a8d6740",
+      "cited_ids": null,
+      "coverage": null
+    },
+    {
+      "question_id": "guarding_standard",
+      "category": "unanswerable",
+      "status": "declined_low_similarity",
+      "top1_score": 0.6296,
+      "judges": {
+        "correctness": "yes",
+        "retrieval_groundedness": "no",
+        "relevance_to_query": "no"
+      },
+      "answer": "I can't answer that from the OSHA severe injury reports: none of them is close enough to the question.",
+      "trace_id": "tr-d691b287ecf168556106f1056f46d195",
+      "cited_ids": null,
+      "coverage": null
+    },
+    {
+      "question_id": "ladder_trend",
+      "category": "unanswerable",
+      "status": "declined_insufficient_evidence",
+      "top1_score": 0.727,
+      "judges": {
+        "correctness": "yes",
+        "retrieval_groundedness": "no",
+        "relevance_to_query": "yes"
+      },
+      "answer": "I can't answer that from the OSHA severe injury reports. The reports provided do not contain enough data to determine whether ladder injuries are increasing or decreasing since 2015.",
+      "trace_id": "tr-46828423490c345714ef9aeecff798e6",
+      "cited_ids": null,
+      "coverage": null
+    },
+    {
+      "question_id": "roofer_name",
+      "category": "unanswerable",
+      "status": "declined_insufficient_evidence",
+      "top1_score": 0.7762,
+      "judges": {
+        "correctness": "yes",
+        "retrieval_groundedness": "no",
+        "relevance_to_query": "yes"
+      },
+      "answer": "I can't answer that from the OSHA severe injury reports. The reports do not provide the name of the roofer who fell through a skylight.",
+      "trace_id": "tr-90bc7dba08fa8a858418c84489dcd31b",
+      "cited_ids": null,
+      "coverage": null
+    },
+    {
+      "question_id": "sue_employer",
+      "category": "unanswerable",
+      "status": "declined_insufficient_evidence",
+      "top1_score": 0.7537,
+      "judges": {
+        "correctness": "yes",
+        "retrieval_groundedness": "no",
+        "relevance_to_query": "yes"
+      },
+      "answer": "I can't answer that from the OSHA severe injury reports. The question seeks legal advice about suing an employer, which cannot be answered from the incident reports provided.",
+      "trace_id": "tr-4a87ee3929faf3bcc08ba3ff37a56b33",
+      "cited_ids": null,
+      "coverage": null
+    },
+    {
+      "question_id": "trench_count_2019",
+      "category": "unanswerable",
+      "status": "declined_insufficient_evidence",
+      "top1_score": 0.7679,
+      "judges": {
+        "correctness": "yes",
+        "retrieval_groundedness": "no",
+        "relevance_to_query": "yes"
+      },
+      "answer": "I can't answer that from the OSHA severe injury reports. The reports do not provide enough data to determine the total number of trench collapse incidents reported in 2019.",
+      "trace_id": "tr-2d012a22adef931c3143556dc5fa63f9",
+      "cited_ids": null,
+      "coverage": null
+    },
+    {
+      "question_id": "worst_employer_ohio",
+      "category": "unanswerable",
+      "status": "declined_low_similarity",
+      "top1_score": 0.5868,
+      "judges": {
+        "correctness": "yes",
+        "retrieval_groundedness": "yes",
+        "relevance_to_query": "no"
+      },
+      "answer": "I can't answer that from the OSHA severe injury reports: none of them is close enough to the question.",
+      "trace_id": "tr-b5290b64c7b93a479ca106e6d58730da",
+      "cited_ids": null,
+      "coverage": null
+    }
+  ],
+  "notes": [
+    "EVAL questions were not run through the assistant before this job; DEV questions tuned prompt v1->v3 locally.",
+    "Judge values on declined rows are not meaningful (groundedness/relevance of a refusal); read them for answered rows only.",
+    "5 of 11 in-domain unanswerable questions were declined by the similarity threshold, not the model (acme_record 0.6495 vs 0.6511).",
+    "conveyor_caught correctness 'no' is a judge false negative: the answer describes hands crushed between rollers and pulled into rollers/pulleys."
+  ]
+}

@@ -1,4 +1,4 @@
-# Safety GenAI assistant: sources, privacy and retrieval design
+# Safety GenAI assistant: sources, privacy, retrieval and grounded answers
 
 Goal: answer safety questions ("What typically causes amputations on press brakes?")
 from OSHA Severe Injury Report narratives. Answers must cite report IDs and say
@@ -182,14 +182,129 @@ TF-IDF on the real corpus, and the reporting path with random vectors.
 
 Evidence: [osha-retrieval-eval.json](osha-retrieval-eval.json).
 
+## Grounded answers (`osha_answer_eval`)
+
+**Question:** can the assistant answer from retrieved reports with citations
+that check out, and decline when the reports can't answer?
+
+**How an answer is made** (`sentinelops.answers`):
+
+1. **Retrieve** the exact top 8 over the 256-dimension index (104 MB, current
+   vectors only). The question is embedded with the Qwen3 query instruction.
+2. **Decline on similarity:** if the top-1 cosine is under the calibrated
+   threshold, decline without calling the model.
+3. **Generate** with `databricks-gpt-oss-120b` (pay-per-token, temperature 0,
+   reasoning effort low, at most 2,048 tokens). Each report sits in
+   `<report id="…">` tags, and the prompt says report text is data, not
+   instructions. The prompt says to decline first for numbers, frequencies,
+   rankings or trends, penalties, legal/medical/compensation advice, standards
+   text, identities, and unrelated questions. Otherwise, every sentence ends
+   with its report IDs, e.g. `[931176]`.
+4. **Decline on the model's word:** a reply containing `INSUFFICIENT_EVIDENCE`
+   becomes a decline message with the model's reason.
+5. **Check citations in code:** GPT-OSS's native `【id】` brackets are rewritten
+   as `[id]`. A draft needs at least one citation, and every cited ID must be
+   among the retrieved reports. Otherwise it's rejected and not shown.
+   Sentence-level citation coverage is measured.
+6. **Output** is Responses-shaped: judges read the text, and code reads
+   `custom_outputs` (status, retrieved IDs, top-1 score, citation check, tokens,
+   DOL attribution).
+
+**Tracing:** one MLflow trace per question: `osha_answer` (CHAIN) →
+`retrieve` (RETRIEVER, documents with `doc_uri` `osha-sir:<report_id>`) →
+`generate` (CHAT_MODEL, token usage) → `check` (PARSER), plus a
+`sentinelops.status` tag. Traces use the experiment's default storage. Unity
+Catalog trace tables need a SQL warehouse to set up and query, so they weren't
+used.
+
+**Method** (`sentinelops.answer_eval`, eval `osha-answers-v1`):
+
+- **DEV set, 16 questions** (6 answerable, 8 unanswerable, 2 off-topic). They
+  were run locally on the real reports, with TF-IDF standing in for dense
+  retrieval, to develop the prompt. Their results are never reported as the
+  evaluation.
+  - v1: GPT-OSS cited as `【id】`, so the code check rejected every draft. It
+    also counted the retrieved reports to answer "how many … in 2022".
+  - v2: ASCII brackets and an example citation fixed citations, but it still
+    counted.
+  - v3: an explicit decline for any number, frequency, share, ranking or
+    trend. All 16 dev decisions were correct.
+  - The dev run also changed the answer key. The Llama judge treated listed
+    alternatives ("objects, particles or chemicals") as all required, and it
+    failed a correct decline worded differently from the expected reason. So
+    facts are now single general claims, and decline rows expect a generic
+    decline.
+- **EVAL set, 28 held-out questions**, none run through the assistant before
+  the job:
+  - 12 answerable; their facts were checked by keyword share in the local
+    corpus;
+  - 11 in-domain unanswerable: penalty, legal advice, employer ranking, a
+    worker's name, a yearly count, standard text, first aid, a trend, future
+    policy, a fictional employer's record, compensation;
+  - 5 off-topic or adversarial, including a "developer mode" request for
+    employer names.
+- **Threshold, calibrated in the job on questions that aren't evaluated.** The
+  on-topic group is the 28 retrieval-eval paraphrases plus 6 dev answerable
+  questions (minimum top-1 0.7095). The off-topic group is 4 retrieval off-topic
+  plus 2 dev off-topic questions (maximum 0.5927). The midpoint is **0.6511**.
+  The job refuses to run if the groups overlap.
+- **Scorers:** code checks the answer/decline decision and citation coverage.
+  Llama 3.3 70B judges score `Correctness`, `RetrievalGroundedness` and
+  `RelevanceToQuery`.
+
+**Results** (run `745084593826476`, MLflow `17406be7875d4a2387785faf3ea9f083`):
+
+| Category | Questions | Correct decisions | Outcome |
+|---|---|---|---|
+| Answerable | 12 | 12 | All answered; citations valid in 12/12 drafts; every sentence cited |
+| In-domain unanswerable | 11 | 11 | 6 declined by the model, 5 by the threshold |
+| Off-topic / adversarial | 5 | 5 | All by the threshold (top-1 0.38–0.58) |
+
+On the 12 answers, the judges passed correctness 11/12, groundedness 12/12
+and relevance 12/12. Answered questions had top-1 scores of 0.717–0.841, a
+margin of at least 0.066 over the threshold.
+
+**Honest caveats:**
+
+- **The threshold did more of the in-domain work than intended.** It caught 5
+  of 11 unanswerable questions, including `acme_record` at 0.6495, just 0.0016
+  under the threshold. The model's own decline was tested on 6 held-out and 8
+  dev questions. Dev unanswerable questions scored 0.619–0.762 (1 of 8 under the
+  threshold). Treat the threshold as a coarse filter; for in-domain questions,
+  the model's decline is the main defence.
+- `conveyor_caught` failed correctness as a judge false negative. The answer
+  describes hands crushed between rollers and workers pulled into rollers and
+  pulleys, yet the judge said "caught in moving conveyor parts" wasn't stated.
+  It stays counted as a failure.
+- `grain_engulfment` was a weak question: the minimized corpus has exactly one
+  grain-engulfment narrative. Retrieval ranked it first, and the answer
+  correctly used only that report. My keyword check had overstated the
+  support.
+- Judge scores on declines aren't meaningful. Groundedness passed 1/11 and
+  relevance 4/11 on correct declines. MLflow's run-level
+  `retrieval_groundedness/mean` (0.50) mixes answers and declines, so use the
+  per-category metrics.
+- 28 questions, one run, no confidence interval. GPT-OSS isn't bit-for-bit
+  deterministic at temperature 0; wording changed between dev runs.
+
+**Cost:**
+
+- Generation: 24,036 input and 2,792 output tokens = 0.075 DBU (≈ CAD 0.01).
+- About 84 judge calls, estimated at ≈ CAD 0.15.
+- Serverless: 8.1 minutes (3.1 of them setup).
+- Local development: about 70 GPT-OSS and 100 judge calls, < CAD 0.2.
+
+Evidence: [osha-answer-eval.json](osha-answer-eval.json), including every
+answer.
+
 ## Next steps
 
 1. Done: exact retrieval and its evaluation (above).
-2. Grounded answers from GPT-OSS-120B with inline `[report_id]` citations,
-   retrieval at 256 dimensions, an abstention rule, and MLflow tracing. The
-   abstention threshold must be calibrated on in-domain questions the reports
-   can't answer, not only on off-topic ones.
-3. Evaluation: correctness, groundedness and relevance using an LLM judge from
-   a different model family (Llama 3.3 70B), plus citation validity checks.
-4. Structured extraction of event, nature, body part and source from
-   narratives, scored against OSHA's codes.
+2. Done: grounded answers with code-checked `[report_id]` citations, a
+   calibrated decline rule, MLflow tracing, and a held-out evaluation with a
+   Llama 3.3 judge (above).
+3. Structured extraction of event, nature, body part and source from
+   narratives with `ai_query` and a JSON schema, scored against OSHA's codes.
+4. A larger answer evaluation, with more in-domain unanswerable questions near
+   the threshold, before any deployment. Deployment (Agent Framework / review
+   app) stays deferred until serving costs are checked.

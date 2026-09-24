@@ -1,6 +1,6 @@
 # Build status
 
-Last verified: September 24, 2026.
+Last verified: September 24, 2026 (grounded answers).
 
 ## Task status
 
@@ -14,7 +14,7 @@ cost or prerequisites, with the reason given.
 | Task | Status | Evidence or next action |
 |---|---|---|
 | Azure foundation: ADLS Gen2, workspace, access connector, UC catalog | Done | `infra/main.bicep`; "Azure" section below |
-| Bundle deployment (dev target, strict validation, manual jobs) | Done | `databricks.yml`, `resources/*.yml`; 11 jobs and pipelines deployed |
+| Bundle deployment (dev target, strict validation, manual jobs) | Done | `databricks.yml`, `resources/*.yml`; 10 jobs and 2 pipelines deployed; a test enforces job guardrails |
 | Cost visibility: meter-level Azure cost query | Done | Found an always-on NAT gateway/IP, ~CAD 1.7/day ("Cost and runtime controls") |
 | Azure budget alert | Not started | Cheap safeguard for the $10/day limit; needs your approval to create |
 | Databricks billing tables (`system.billing`) access | Not started | Needs an account/metastore admin grant |
@@ -56,26 +56,67 @@ cost or prerequisites, with the reason given.
 | Retrieval cost decision (no Vector Search endpoint) | Done | Chosen by you; endpoint would be ~CAD 9.3/day |
 | Document embeddings (`osha_embed`) | Done | 105,993 vectors; `osha-embedding-backfill.json` |
 | Exact retrieval + code-based retrieval evaluation (1,024 vs 256 dimensions) | Done | Dense P@10 0.882 vs TF-IDF 0.786; 256 dims = 1,024 quality at 1/4 memory; `osha-retrieval-eval.json` |
-| Grounded answers with `[report_id]` citations, abstention, MLflow tracing | **Next** | GPT-OSS-120B (pay-per-token), 256-dim retrieval; calibrate abstention on in-domain unanswerable questions |
-| LLM-judge evaluation (correctness, groundedness, relevance) | Not started | Judge from a different model family (Llama 3.3 70B) |
-| Structured extraction scored against OSHA codes | Not started | |
+| Grounded answers with `[report_id]` citations, abstention, MLflow tracing | Done | GPT-OSS-120B over 256-dim retrieval; code-checked citations; threshold 0.6511 + model decline; `osha-answer-eval.json` |
+| LLM-judge evaluation (correctness, groundedness, relevance) | Done (28 held-out questions) | Llama 3.3 70B judge: 28/28 correct answer/decline decisions; on answers, correctness 11/12, groundedness 12/12. A larger set is still needed before deployment |
+| Structured extraction scored against OSHA codes | **Next** | `ai_query` with a JSON-schema `responseFormat`; score event, nature, body part and source |
 | Agent deployment / review app | Deferred | Check serving cost first; scale-to-zero only |
 
 ### Analytics and delivery
 
 | Task | Status | Evidence or next action |
 |---|---|---|
-| Unit tests (36) and local CI workflow file | Done (local) | `.github/workflows/ci.yml` has never run: no remote |
+| Unit tests (57) and local CI workflow file | Done (local) | `.github/workflows/ci.yml` has never run: no remote |
 | Git history | Done (local) | Branch `main`; no remote |
 | GitHub repository, CI runs, OIDC deployment to staging/prod | Not started | Needs your choice of repository and visibility |
 | AI/BI dashboard and Genie space | Not started | Viewing uses SQL warehouse time |
 | Demo script and portfolio write-up | Not started | Last |
 
-Recommended order: grounded answers and evaluation →
-structured extraction → orchestrated retraining and alerts → dashboard/Genie →
-serving demo → API/streaming sources → environments and CI/CD.
+Recommended order: structured extraction → orchestrated retraining and alerts →
+dashboard/Genie → serving demo → API/streaming sources → environments and CI/CD.
+A larger answer evaluation comes before any assistant deployment.
 
-## Current milestone: Safety GenAI retrieval evaluation (OSHA)
+## Current milestone: Safety GenAI grounded answers (OSHA)
+
+The assistant now answers from retrieved OSHA reports. It cites report IDs,
+code checks the citations, and it declines when the reports can't answer.
+Every question is traced in MLflow. Details:
+[SAFETY_RAG.md](SAFETY_RAG.md#grounded-answers-osha_answer_eval).
+
+- **Job `osha_answer_eval`** (`1029765841933443`), run `745084593826476`
+  **SUCCESS** (8.1 min, 3.1 of them setup). MLflow run
+  `17406be7875d4a2387785faf3ea9f083` in `sentinelops-safety-rag` holds 28
+  traces with the expected spans: 12 answers ran retrieve → generate → check,
+  6 model declines ran retrieve → generate, and 10 threshold declines ran
+  retrieve only.
+- **Held-out questions** (none run before the job): 12 answerable, 11
+  in-domain unanswerable, 5 off-topic. **28/28 correct decisions.** Every draft
+  answer's citations were valid and every sentence was cited. The Llama 3.3
+  judge passed correctness 11/12 (the miss is a judge false negative, kept as
+  a failure), groundedness 12/12 and relevance 12/12.
+- **Decline rule:**
+  - The threshold is 0.6511, the midpoint between the lowest on-topic score
+    (0.7095) and the highest off-topic score (0.5927) on 40 questions that
+    aren't evaluated.
+  - The model declines numbers and trends, advice, penalties, standards text
+    and identities.
+  - Caveat: the threshold caught 5 of the 11 in-domain unanswerable questions,
+    one only 0.0016 below it. The model's decline was tested on 6 held-out and
+    8 dev questions.
+- **Prompt development was confined to 16 dev questions**, run locally on real
+  reports:
+  - v1 used `【id】` brackets, which the code check rejected.
+  - v1 and v2 answered "how many … in 2022" by counting the retrieved sample.
+  - v3 fixed both.
+  - The dev run also exposed judge literalism, so the answer key uses single
+    general facts and generic declines.
+- Cost: generation 0.075 DBU (≈ CAD 0.01); about 84 judge calls
+  (≈ CAD 0.15, estimated); about 8 min of serverless; local development
+  < CAD 0.2. Nothing is running afterwards.
+- Tests: 57 pass (21 new: citations, decline paths, the chat client's
+  visible retries, trace shape, question-set hygiene, calibration, summaries,
+  and bundle job guardrails).
+
+## Earlier milestone: Safety GenAI retrieval evaluation (OSHA)
 
 Exact dense search is validated against OSHA-code relevance and beats a
 keyword baseline. 256 dimensions are chosen for the assistant. Details:

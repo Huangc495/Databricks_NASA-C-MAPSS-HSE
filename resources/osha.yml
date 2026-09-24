@@ -96,3 +96,50 @@ resources:
               - pandas==2.3.3
               - scikit-learn==1.9.1
               - mlflow==3.16.1
+    # Manual only. Grounded answers with code-checked [report_id] citations and a calibrated
+    # decline rule (GPT-OSS-120B over 256-dim exact retrieval), judged by Llama 3.3 70B on
+    # held-out questions. One MLflow trace per question; pay-per-token endpoints only.
+    osha_answer_eval:
+      name: sentinelops-osha-answer-eval
+      max_concurrent_runs: 1
+      timeout_seconds: 1500
+      performance_target: STANDARD
+      tasks:
+        - task_key: evaluate
+          max_retries: 0
+          timeout_seconds: 1500
+          spark_python_task:
+            python_file: ../jobs/evaluate_answers.py
+            parameters:
+              - --catalog
+              - ${var.catalog}
+              - --embedding-endpoint
+              - databricks-qwen3-embedding-0-6b
+              - --chat-endpoint
+              - databricks-gpt-oss-120b
+              - --judge-endpoint
+              - databricks-meta-llama-3-3-70b-instruct
+              - --dimensions
+              - '256'
+              - --k
+              - '8'
+              - --max-tokens
+              - '2048'
+              - --reasoning-effort
+              - low
+              - --workers
+              - '2'
+              - --job-run-id
+              - '{{job.run_id}}'
+              - --source-root
+              - ${workspace.file_path}/src
+          environment_key: answers
+      environments:
+        - environment_key: answers
+          spec:
+            environment_version: '4'
+            dependencies:
+              - numpy==2.5.3
+              - pandas==2.3.3
+              - mlflow==3.16.1
+              - databricks-sdk==0.140.0
