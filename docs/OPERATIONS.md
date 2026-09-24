@@ -1,7 +1,8 @@
 # Operational ML: promotion, fleet scoring and monitoring
 
-This milestone puts the Gold-trained model into a batch operating loop. There is
-still no real-time serving endpoint (see "Serving" below).
+This milestone puts the Gold-trained model into a batch operating loop. Real-time
+serving is a bounded demo on the same Gold feature contract (see "Real-time
+serving" below).
 
 ```mermaid
 flowchart LR
@@ -167,17 +168,89 @@ repeat test made exactly one attempt. Before this fix, a failed paid-model job
 (`osha_answer_eval`, `osha_extraction_eval`, `osha_embed`) could have repeated
 its model calls. No earlier run had actually failed that way.
 
-## Serving (deferred)
+## Real-time serving (bounded demo)
 
-No Model Serving endpoint exists. The model needs 10 cycles of history per
-engine, so a real-time contract must either:
+The model needs 10 cycles of history per engine, so a real-time contract must
+either:
 
 - accept Gold-format feature rows computed by the Spark pipeline, or
 - look features up by engine key from a synced online store.
 
-It must not recompute features with pandas. An endpoint (and inference tables)
-should be created only for a bounded demo and deleted afterwards, because
-provisioned serving compute bills while it is up.
+It must not recompute features with pandas. The demo uses the first option:
+clients send rows of `gold.cmapss_features` in `sentinelops.model.FEATURES`
+order as MLflow `dataframe_split` JSON. JSON floats round-trip doubles
+exactly, so served predictions can be compared with the batch log bit for bit.
+
+- **Endpoint** `sentinelops-rul-demo` ([infra/serving-endpoint.json](../infra/serving-endpoint.json)):
+  - serves `turbofan_rul` v3 (the `@champion`) on a Small CPU (0–4
+    concurrency) with scale-to-zero;
+  - has an AI Gateway inference table, `sentinelops_dev.sentinelops_dev.turbofan_rul_demo_payload`.
+- **Not a bundle resource.** The endpoint bills while it's provisioned, so
+  it is created for a demo and deleted afterwards:
+
+  ```powershell
+  .tools/databricks/databricks.exe serving-endpoints create --json '@infra/serving-endpoint.json' --no-wait
+  .tools/databricks/databricks.exe bundle run -t dev cmapss_serving_check
+  .tools/databricks/databricks.exe serving-endpoints delete sentinelops-rul-demo
+  ```
+
+- **Parity job** `cmapss_serving_check` (`jobs/check_serving.py`) sends every
+  fleet row of the Gold features to the endpoint in batches of 400. It fails
+  unless every prediction is bit-identical to `gold.cmapss_predictions` for
+  the served version, and that version is the `@champion`. It also measures
+  single-row latency on the engines closest to failure, and checks that the
+  requests reached the inference table. Retries on 429/502/503/504 (cold
+  starts) are recorded in its report.
+- **Cost:**
+  - CPU serving is 1 DBU/h per unit of provisioned concurrency, at CAD 0.097
+    per DBU, so Small costs at most about CAD 0.39/h while scaled up, and
+    nothing at zero;
+  - inference tables cost 7.143 DBU per GB of payload (about CAD 0.01 here);
+  - scale-to-zero means a cold start on the first request, and it isn't
+    recommended for production.
+
+**Results (September 24, 2026).** Evidence: [serving-demo.json](serving-demo.json).
+
+- **Provisioning:** created at 17:16 UTC and READY about 10 minutes later.
+  Most of that time was the container build.
+- **Parity:** run `1018787913287976` **SUCCESS**. All **13,096** fleet rows
+  are **bit-identical** to `gold.cmapss_predictions` for v3 (maximum absolute
+  difference 0.0). The served version is the `@champion`. For example, engine
+  34 at cycle 203 is served as 6.635345210981352 cycles, the same as the
+  batch log.
+- **Latency, warm endpoint, called from a serverless job in the same
+  region:**
+  - batches of 400 rows: p50 250 ms, p95 293 ms (33 calls);
+  - single rows: p50 81 ms, p95 85 ms (20 calls);
+  - no retries were needed.
+- **A mistake, caught by the check:** the first run, `959774648252926`,
+  failed. `cycle` is both a Gold key and the first model feature, so selecting
+  keys plus features repeated it, and every request row was shifted by one
+  column. The endpoint accepted and scored those 33 misaligned requests,
+  because the types still matched the signature. The job then failed on a
+  pandas merge. The job now selects `cycle` once, and `request_body` rejects
+  duplicate column labels (a test covers it).
+  - **Lesson:** schema enforcement doesn't catch a column shift between
+    same-typed features. Rehearse the job's own frame handling locally before
+    the cloud run.
+- **Inference table:** every request was logged, with status 200, no logging
+  errors, and 3–17 ms of model execution per request.
+  - The failed run's 33 requests landed at 17:34–17:35 and are identifiable
+    by time.
+  - The parity run's 53 requests (13,116 predictions) landed at 17:44.
+  - Delivery wasn't fast: the rows were absent 4 minutes after the run and
+    present 40 minutes later. No `_otel_logs` table was created, so this
+    endpoint used standard delivery, not the fast CPU path the docs describe.
+  - The check job's 3-minute wait was therefore too short. Treat inference
+    tables as delayed evidence, not a synchronous check.
+- **Deleted** at 18:28 UTC. No custom serving endpoints remain; the inference
+  table is kept.
+- **Cost (estimate):**
+  - serving: at most ~CAD 0.35, since it scaled to zero after 30 idle
+    minutes;
+  - check job: about CAD 0.30 across both runs;
+  - inference table: about CAD 0.02;
+  - warehouse checks of the inference table: about CAD 0.7.
 
 ## Runbook
 

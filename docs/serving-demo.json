@@ -1,0 +1,229 @@
+{
+  "endpoint": {
+    "definition": "infra/serving-endpoint.json",
+    "name": "sentinelops-rul-demo",
+    "id": "1468bb08b40040eca427a73c0e8897f1",
+    "served": "sentinelops_dev.sentinelops_dev.turbofan_rul v3",
+    "workload": "CPU Small (0-4 concurrency), scale-to-zero",
+    "created_utc": "2026-09-24T17:16:17Z",
+    "ready_utc": "2026-09-24T17:26:30Z (about 10 min)",
+    "provisioning_states": [
+      "Creating resources for served entity",
+      "Container creation pending",
+      "Deploying served entities (from ~8 min)",
+      "READY at ~10 min"
+    ],
+    "deleted_utc": "2026-09-24T18:28:07Z",
+    "after_deletion": "No custom serving endpoints remain; the inference table (MANAGED) is kept as evidence."
+  },
+  "check_job": {
+    "name": "cmapss_serving_check",
+    "job_id": 782318629064026
+  },
+  "runs": [
+    {
+      "run_id": 959774648252926,
+      "result": "FAILED",
+      "cause": "Selecting keys + features repeated 'cycle' (a key and the first feature). Every request row was shifted by one column, so the endpoint scored misaligned inputs; the job then failed on a pandas merge ('The column label cycle is not unique'). Those 33 requests (about 17:31 UTC) are not evidence. Fixed in the job; request_body now rejects duplicate columns (test added)."
+    },
+    {
+      "run_id": 1018787913287976,
+      "result": "SUCCESS",
+      "run_seconds": 659.2,
+      "setup_seconds": 225.0,
+      "execution_seconds": 433.0,
+      "report": {
+        "endpoint": "sentinelops-rul-demo",
+        "model": "sentinelops_dev.sentinelops_dev.turbofan_rul",
+        "served_version": 3,
+        "champion_version": 3,
+        "fleet_rows": 13096,
+        "logged_rows_for_version": 13096,
+        "parity": {
+          "rows_compared": 13096,
+          "rows_unmatched": 0,
+          "bit_identical": 13096,
+          "max_abs_diff": 0.0,
+          "mismatches_over_1e_9": 0
+        },
+        "batches": {
+          "calls": 33,
+          "p50_ms": 249.9,
+          "p95_ms": 292.5,
+          "max_ms": 351.4,
+          "rows_per_batch": 400,
+          "retried_statuses": []
+        },
+        "single_row": {
+          "calls": 20,
+          "p50_ms": 80.7,
+          "p95_ms": 85.3,
+          "max_ms": 91.9,
+          "examples": [
+            {
+              "unit": 34,
+              "cycle": 203,
+              "predicted_rul": 6.635345210981352
+            },
+            {
+              "unit": 35,
+              "cycle": 198,
+              "predicted_rul": 8.399291556463226
+            },
+            {
+              "unit": 81,
+              "cycle": 213,
+              "predicted_rul": 10.17710372981359
+            },
+            {
+              "unit": 68,
+              "cycle": 187,
+              "predicted_rul": 10.414534300221842
+            },
+            {
+              "unit": 76,
+              "cycle": 205,
+              "predicted_rul": 11.637951998293257
+            },
+            {
+              "unit": 82,
+              "cycle": 162,
+              "predicted_rul": 11.909448473587608
+            },
+            {
+              "unit": 31,
+              "cycle": 196,
+              "predicted_rul": 11.918919496760566
+            },
+            {
+              "unit": 91,
+              "cycle": 234,
+              "predicted_rul": 12.479426359622519
+            },
+            {
+              "unit": 66,
+              "cycle": 147,
+              "predicted_rul": 13.282286460108725
+            },
+            {
+              "unit": 56,
+              "cycle": 136,
+              "predicted_rul": 13.861255351729099
+            },
+            {
+              "unit": 49,
+              "cycle": 303,
+              "predicted_rul": 15.147779382429798
+            },
+            {
+              "unit": 92,
+              "cycle": 150,
+              "predicted_rul": 15.471539296781701
+            },
+            {
+              "unit": 100,
+              "cycle": 198,
+              "predicted_rul": 18.018366903160107
+            },
+            {
+              "unit": 20,
+              "cycle": 184,
+              "predicted_rul": 18.844797492895328
+            },
+            {
+              "unit": 36,
+              "cycle": 126,
+              "predicted_rul": 19.170982052080255
+            },
+            {
+              "unit": 24,
+              "cycle": 186,
+              "predicted_rul": 21.305766113948334
+            },
+            {
+              "unit": 40,
+              "cycle": 133,
+              "predicted_rul": 22.917352250744127
+            },
+            {
+              "unit": 42,
+              "cycle": 156,
+              "predicted_rul": 23.74980528735789
+            },
+            {
+              "unit": 90,
+              "cycle": 146,
+              "predicted_rul": 28.302531334531714
+            },
+            {
+              "unit": 52,
+              "cycle": 189,
+              "predicted_rul": 33.53666930221753
+            }
+          ]
+        },
+        "inference_table": {
+          "table": "sentinelops_dev.sentinelops_dev.turbofan_rul_demo_payload",
+          "rows_since_check_started": 0,
+          "requests_sent": 53
+        },
+        "seconds": 385.2
+      }
+    }
+  ],
+  "inference_table": {
+    "table": "sentinelops_dev.sentinelops_dev.turbofan_rul_demo_payload",
+    "status": "delivered",
+    "delivery": "Not visible at 17:48 UTC (4 min after the parity run's requests); all rows present at 18:27 UTC. No _otel_logs table was created, so this endpoint used standard (not fast-path) delivery.",
+    "rows_by_minute": [
+      {
+        "minute_utc": "17:34",
+        "requests": 32,
+        "status_200": 32,
+        "predictions": 12800,
+        "run": "959774648252926 (failed run; misaligned requests, not evidence)"
+      },
+      {
+        "minute_utc": "17:35",
+        "requests": 1,
+        "status_200": 1,
+        "predictions": 296,
+        "run": "959774648252926"
+      },
+      {
+        "minute_utc": "17:44",
+        "requests": 53,
+        "status_200": 53,
+        "predictions": 13116,
+        "run": "1018787913287976: 33 batches (13,096 rows) + 20 single-row calls"
+      }
+    ],
+    "logging_errors": 0,
+    "max_model_execution_ms": 17,
+    "checks": [
+      {
+        "utc": "2026-09-24T17:44Z",
+        "source": "check job",
+        "rows_since_check_started": 0
+      },
+      {
+        "utc": "2026-09-24T17:48Z",
+        "source": "SQL warehouse",
+        "rows_total": 0,
+        "note": "table exists; no _otel_logs table, so standard (not fast-path) delivery"
+      },
+      {
+        "utc": "2026-09-24T18:27Z",
+        "source": "SQL warehouse",
+        "rows_total": 86
+      }
+    ]
+  },
+  "cost_estimate_cad": {
+    "serving": "Small CPU, up to 4 DBU/h at CAD 0.097 while scaled up (about 17:26-18:14 before scale-to-zero): <= ~0.35",
+    "check_job": "two serverless runs, 7.9 + 11.0 min: ~0.30",
+    "inference_table": "~27 MB of payload at 7.143 DBU/GB: ~0.02",
+    "warehouse_checks": "two inference-table checks on the 2X-Small warehouse: ~0.7",
+    "note": "Estimates; posted Azure cost lags about 9 hours."
+  }
+}

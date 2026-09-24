@@ -1,0 +1,50 @@
+resources:
+  jobs:
+    # Manual only, for the bounded serving demo. The endpoint itself is not a bundle resource: it
+    # bills while provisioned, so it is created from infra/serving-endpoint.json for a demo and
+    # deleted afterwards. This job sends every fleet row of the Spark-computed Gold features to the
+    # endpoint and requires predictions bit-identical to gold.cmapss_predictions for the served
+    # version, which must be the @champion.
+    cmapss_serving_check:
+      name: sentinelops-cmapss-serving-check
+      max_concurrent_runs: 1
+      timeout_seconds: 1200
+      performance_target: STANDARD
+      parameters:
+        - name: endpoint
+          default: sentinelops-rul-demo
+      tasks:
+        - task_key: parity
+          max_retries: 0
+          disable_auto_optimization: true
+          timeout_seconds: 1200
+          spark_python_task:
+            python_file: ../jobs/check_serving.py
+            parameters:
+              - --catalog
+              - ${var.catalog}
+              - --schema
+              - ${var.schema}
+              - --subset
+              - FD001
+              - --fleet-split
+              - test
+              - --endpoint
+              - '{{job.parameters.endpoint}}'
+              - --single-row-calls
+              - '20'
+              - --job-run-id
+              - '{{job.run_id}}'
+              - --source-root
+              - ${workspace.file_path}/src
+          environment_key: serving
+      environments:
+        - environment_key: serving
+          spec:
+            environment_version: '4'
+            dependencies:
+              - numpy==2.5.3
+              - pandas==2.3.3
+              - scikit-learn==1.9.1
+              - mlflow==3.16.1
+              - databricks-sdk==0.140.0

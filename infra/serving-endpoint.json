@@ -1,0 +1,27 @@
+{
+  "name": "sentinelops-rul-demo",
+  "config": {
+    "served_entities": [
+      {
+        "name": "turbofan-rul-v3",
+        "entity_name": "sentinelops_dev.sentinelops_dev.turbofan_rul",
+        "entity_version": "3",
+        "workload_type": "CPU",
+        "workload_size": "Small",
+        "scale_to_zero_enabled": true
+      }
+    ]
+  },
+  "ai_gateway": {
+    "inference_table_config": {
+      "catalog_name": "sentinelops_dev",
+      "schema_name": "sentinelops_dev",
+      "table_name_prefix": "turbofan_rul_demo",
+      "enabled": true
+    }
+  },
+  "tags": [
+    {"key": "project", "value": "sentinelops"},
+    {"key": "lifetime", "value": "bounded-demo"}
+  ]
+}
