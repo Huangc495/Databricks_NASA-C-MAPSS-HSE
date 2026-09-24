@@ -1,7 +1,8 @@
 # SentinelOps — handover for the next session
 
-Last updated: September 24, 2026, 09:20 UTC. Git `main` holds every milestone
-so far (9 commits, no remote); see section 6.
+Last updated: September 24, 2026, 17:00 UTC. Git `main` holds every milestone
+up to orchestrated retraining; the dashboards/Genie milestone is uncommitted
+until the user asks (no remote); see section 6.
 
 **Where things stand.** Both halves of the portfolio project run in Azure
 Databricks, and every job is manual, bounded and verified.
@@ -23,9 +24,19 @@ Databricks, and every job is manual, bounded and verified.
   - Structured extraction scored against harmonized OSHA codes. GPT-OSS-120B
     matches a supervised TF-IDF model on three fields but trails on source
     (0.760 vs 0.825).
+- **Self-service analytics:**
+  - Two AI/BI dashboards (Fleet health, Safety incidents) and one Genie space,
+    all bundle resources.
+  - The `analytics_refresh` job builds `gold.osha_injury_facts` and
+    `gold.cmapss_fleet_status`, and checks every dashboard and Genie query on
+    serverless compute first.
+  - Genie: on 8 held-out questions, 6 fully correct answers, 1 correct decline
+    of an employer-identification probe, and 1 miscounted summary (21 vs 20).
+- **Cost guardrails:**
+  - Budget `sentinelops-dev-monthly`: CAD 150/month, with email alerts.
+  - The starter warehouse is now 2X-Small with a 5-minute auto-stop.
 - **What's left is in section 3**, in the recommended order. The next task is
-  the AI/BI dashboard and Genie space. It needs SQL warehouse time, so ask
-  first.
+  the real-time serving demo. It creates a serving endpoint, so ask first.
 
 The authoritative task tracker is the **Task status** table at the top of
 [docs/STATUS.md](docs/STATUS.md). Update it as work lands.
@@ -37,23 +48,26 @@ The authoritative task tracker is the **Task status** table at the top of
    - `docs/STATUS.md` (task table + current milestone);
    - `docs/SAFETY_RAG.md` (design, measurements, retrieval, answer and extraction evaluations);
    - `docs/OPERATIONS.md` (orchestration, alerts, serving notes) and `docs/INGESTION.md`;
+   - `docs/ANALYTICS.md` (dashboards, Genie, analytics marts, warehouse cost);
    - `SentinelOps.md` for the full intended scope.
 2. Verify the environment and that nothing is running (all free):
 
 ```powershell
 . ./scripts/Use-SentinelOps.ps1
 az account show --query '{name:name,id:id,user:user.name}' -o json
-.venv/Scripts/python.exe -m pytest -q                      # expect 67 passed
+.venv/Scripts/python.exe -m pytest -q                      # expect 82 passed
 .tools/databricks/databricks.exe bundle validate --strict -t dev
 .tools/databricks/databricks.exe jobs list-runs --active-only -o json
 .tools/databricks/databricks.exe clusters list -o json
-.tools/databricks/databricks.exe warehouses list -o json   # starter warehouse should be STOPPED
+.tools/databricks/databricks.exe warehouses list -o json   # starter warehouse: STOPPED, 2X-Small, auto-stop 5
 .tools/databricks/databricks.exe vector-search-endpoints list-endpoints -o json   # expect none
 .tools/databricks/databricks.exe model-versions get-by-alias sentinelops_dev.sentinelops_dev.turbofan_rul champion -o json
 ```
 
 3. Check posted costs before any compute. Billing lags about 9 hours, and
-   an empty or low number is **not** proof of low spend:
+   an empty or low number is **not** proof of low spend. September 24 (UTC)
+   was projected at about CAD 10.6, just over CAD 10 (see the STATUS
+   milestone), so start new billable work on September 25 or later.
 
 ```powershell
 az rest --method post --url 'https://management.azure.com/subscriptions/b1026367-46bf-43e0-93b5-bbfcc45a2291/providers/Microsoft.CostManagement/query?api-version=2023-03-01' --body '@infra/cost-query.json' --query properties.rows -o json
@@ -62,8 +76,10 @@ az rest --method post --url 'https://management.azure.com/subscriptions/b1026367
 ## 2. Authorization and non-negotiable constraints
 
 - The user authorized Azure work under `cheng.huang.ca@outlook.com` with a
-  budget of **up to $10/day** for the whole demo. No hard cutoff or budget alert
-  exists. About CAD 1.7/day is fixed (the managed resource group's NAT gateway
+  budget of **up to $10/day** for the whole demo (treated as CAD, the
+  conservative reading). There is no hard cutoff. Budget
+  `sentinelops-dev-monthly` (CAD 150/month on both resource groups) emails at
+  50%, 80% and 100% of actual spend and at 100% of forecast. About CAD 1.7/day is fixed (the managed resource group's NAT gateway
   and public IP bill 24/7). Serverless jobs cost ~CAD 0.62/DBU, roughly 1.5 DBU
   per hour of job time. Pay-per-token model calls are cheap (see SAFETY_RAG.md).
 - **No Vector Search endpoint.** The user chose exact retrieval, because a
@@ -71,6 +87,10 @@ az rest --method post --url 'https://management.azure.com/subscriptions/b1026367
   is deleted. Don't leave serving endpoints, Event Hubs or SQL compute running.
   Anything billed by the hour is a bounded demo, deleted afterwards, and needs
   the user's go-ahead.
+- **SQL warehouse:** the Serverless Starter Warehouse (`b8a552e38652e685`) is
+  2X-Small (4 DBU/h ≈ CAD 3.9/h) with a 5-minute auto-stop. Each wake-up
+  costs at least ~CAD 0.35. Opening a dashboard, asking Genie, creating a Genie
+  space, or opening Catalog Explorer sample data all start it.
 - Ask before downloading files, creating billable or long-lived resources,
   changing permissions or grants, or deleting anything. Commit only when the
   user asks. There is **no Git remote**; don't create one or push without the
@@ -94,8 +114,6 @@ front.
 
 | # | Task | Approval needed | Cost character |
 |---|---|---|---|
-| 0 | Azure budget alert (any time; cheap safeguard) | Yes: it creates a resource and emails the user | Free |
-| 1 | AI/BI dashboard and Genie space | Yes: SQL warehouse use | Warehouse minutes while queries run (10-min auto-stop) |
 | 2 | Real-time serving demo (C-MAPSS champion) | Yes: a serving endpoint | Bills while provisioned; scale-to-zero; delete afterwards |
 | 3 | Larger answer evaluation, then (optionally) agent deployment and review app | Deployment: yes | Evaluation: pay-per-token cents. Deployment: serving endpoint |
 | 4 | REST API ingestion (for example weather or energy JSON) | Yes: new external data source and download | Serverless job minutes |
@@ -104,39 +122,20 @@ front.
 | 7 | Optional ML depth: FD002–FD004, hyperparameter tuning, `mlflow.evaluate`, a sequence baseline, Lakehouse Monitoring | Only if it adds billable resources | Serverless job minutes |
 | 8 | Demo script and portfolio write-up | No (publishing anything externally: yes) | Free |
 
-### 0. Azure budget alert
+Done since the last handover: **0. the budget alert** and **1. the AI/BI
+dashboards and Genie space** (see `docs/ANALYTICS.md` and the STATUS
+milestone). Open follow-ups from task 1, all optional:
 
-No hard cutoff or alert exists, and later tasks add hourly-billed resources. A
-Cost Management budget on the two SentinelOps resource groups is a free,
-useful first step. Propose a daily-equivalent threshold under $10 and the
-user's email, and get approval before creating it. `system.billing` access
-still needs an account or metastore admin grant, which the user must arrange.
+- Screenshots for the write-up. The in-app browser can't save them; ask the
+  user to capture them, or use Claude in Chrome if it's connected.
+- A larger Genie question set. Keep new questions held out, and treat the
+  alert-count fix as tuned.
+- A Genie benchmark set: `benchmarks` in the serialized space; it uses
+  warehouse time.
+- Add `analytics_refresh` as a final task of `cmapss_retrain`, so
+  `cmapss_fleet_status` can't go stale after a promotion.
 
-### 1. AI/BI dashboard and Genie space (next)
-
-**This needs SQL warehouse time; ask the user first.** Check the current
-serverless SQL price for `westus2` and state the cost. Use the existing
-Serverless Starter Warehouse (10-minute auto-stop), and confirm it is
-`STOPPED` in the inventory afterwards.
-
-1. **Dashboards as bundle resources** (`resources: dashboards:` with a
-   `.lvdash.json`), so they deploy and validate like the jobs:
-   - **Fleet health:** `gold.cmapss_predictions`, `cmapss_model_performance`
-     snapshots by segment, `cmapss_feature_drift` (raw vs age-matched PSI),
-     and `cmapss_alerts`.
-   - **Safety:** OSHA injury types over time from `gold.osha_documents`, by
-     OIICS division and harmonized category. Reuse the
-     `sentinelops.extraction` rules as SQL, or write a small Gold table from
-     them; codes changed in 2024, so never chart raw code prefixes across
-     years. Include DOL attribution. `osha_documents` is already minimized;
-     show no narratives in bulk, and never identify workers or employers.
-2. **Genie space** over a small, curated set of Gold tables, with
-   instructions, sample questions and table/column comments. Check the
-   current API or bundle support for Genie spaces.
-3. Record the warehouse minutes used and JSON or screenshot evidence under
-   `docs/`.
-
-### 2. Real-time serving demo
+### 2. Real-time serving demo (next)
 
 - Serve `@champion` (v3) from Model Serving with **scale-to-zero**, as a
   bounded demo. Delete the endpoint afterwards and confirm in the inventory.
@@ -191,6 +190,14 @@ Serverless Starter Warehouse (10-minute auto-stop), and confirm it is
 
 ### What exists (reuse, don't rebuild)
 
+- **Analytics:** job `analytics_refresh` (manual; run it after `osha_ingest` or
+  `cmapss_retrain`) rebuilds `gold.osha_injury_facts` and
+  `gold.cmapss_fleet_status` with `INSERT OVERWRITE`, which keeps their comments
+  and primary keys. It comments the monitoring tables, then runs every dataset
+  in `dashboards/*.lvdash.json` and every Genie example query from
+  `resources/analytics.yml`. Change dashboards by editing the JSON, then run
+  `tests/test_analytics.py`, the job, and a render check.
+
 - **C-MAPSS:**
   - `cmapss_retrain` runs ingest → verify → train (only when Gold training
     digests change; `force_retrain` overrides) → promote (an undecided
@@ -242,6 +249,15 @@ Serverless Starter Warehouse (10-minute auto-stop), and confirm it is
 | If/else conditions need task values | `dbutils.jobs.taskValues.set` works only in notebooks, whose environment differs from the pinned one. `cmapss_retrain` uses self-deciding steps (`--only-if-changed`, `--only-pending`) instead |
 | Running one task of a job | `jobs run-now --json @file` with `"only": ["task"]` and `job_parameters`; other tasks show `DISABLED`, and a failure reads `INTERNAL_ERROR`/`FAILED` |
 | Inline Python in PowerShell 5.1 loses its double quotes | Put the Python in a file and run it; write JSON request bodies to a file and pass `@file` |
+| Unexplained serverless SQL cost | Catalog Explorer sample data starts the starter warehouse. Query history (`w.query_history.list`, field `client_application`) shows who started it |
+| Genie space deploy fails with 403 "Table ... does not exist" | Its tables must exist first: deploy, run `analytics_refresh`, then deploy again |
+| Creating or updating a Genie space | It starts the SQL warehouse (it samples the tables) |
+| AI/BI table shows "Visualization has no fields selected" | Table spec version 1 needs many per-column fields; use version 2 with `fieldName` and `displayName` |
+| Chart series share colors | The renderer cycles 10 colors, and extra `mark.colors` are ignored; keep at most 10 series (a test checks the color columns) |
+| Dashboard and Genie SQL bugs | Check them in `analytics_refresh` on serverless job compute (CAD 0.62/DBU, no idle tail), not on the warehouse |
+| Genie summary numbers | It miscounted 43 listed rows (21 vs 20). Give example SQL that aggregates (`count_if`), and check its SQL results, not its prose |
+| Every deploy "updates" three jobs | `cmapss_ingest`, `osha_ingest` and `cmapss_retrain` resend identical settings (the API doesn't echo `disable_auto_optimization` on pipeline tasks); harmless. `bundle deploy --select <resource>` deploys one resource |
+| Browser checks of the workspace | The in-app browser needs the user to sign in, and it can't save screenshots or zoom. Record render checks as text and JSON |
 
 ## 5. Resources
 
@@ -269,9 +285,14 @@ with the CLI (`infra/uc-*.json`). Bundle `sentinelops`, target `dev`.
 | job `osha_answer_eval` | `1029765841933443` | Grounded answers on held-out questions + Llama 3.3 judges (run `745084593826476`) |
 | job `osha_extraction_eval` | `804198192778755` | Structured extraction vs OSHA codes and baselines (run `570236144351626`) |
 | job `cmapss_retrain` | `1037945637149770` | Orchestrated ingest → … → alerts (run `599725542930474`; breach test `955572570273055`) |
+| job `analytics_refresh` | `847239470140874` | Analytics marts, comments, dashboard/Genie SQL checks (run `429694746857912`) |
+| dashboard `fleet_health` / `safety_incidents` | `01f1b83350951effa1d1f1bc6ca9e6cd` / `01f1b83350861a42888ebab34d8a8785` | AI/BI dashboards, published with viewer credentials |
+| genie space `sentinelops_operations` | `01f1b8347de912dc8d94fcb07a9144ec` | Genie over 6 curated Gold tables |
 
 All jobs are manual, STANDARD, one concurrent run, zero retries (including
-serverless auto-optimization retries), with timeouts and no schedules. Pipelines are triggered serverless with
+serverless auto-optimization retries), with timeouts and no schedules. Azure
+budget `sentinelops-dev-monthly` (subscription scope, filtered to the two
+resource groups) is defined in `infra/budget.json`. Pipelines are triggered serverless with
 development mode off.
 
 - Model: `sentinelops_dev.sentinelops_dev.turbofan_rul` — **v3 `@champion`**
@@ -290,7 +311,7 @@ development mode off.
 - Tables:
   - `bronze.{cmapss_lines, cmapss_labels, osha_sir_reports}`
   - `silver.{cmapss_observations, cmapss_quarantine, cmapss_conflicts, cmapss_endpoint_labels, osha_incidents, osha_quarantine}`
-  - `gold.{cmapss_features, cmapss_training_labels, cmapss_test_endpoints, cmapss_predictions, cmapss_model_performance, cmapss_feature_drift, cmapss_alerts, osha_documents, osha_embeddings, osha_extractions}`
+  - `gold.{cmapss_features, cmapss_training_labels, cmapss_test_endpoints, cmapss_predictions, cmapss_model_performance, cmapss_feature_drift, cmapss_alerts, cmapss_fleet_status, osha_documents, osha_embeddings, osha_extractions, osha_injury_facts}`
   - bootstrap `sentinelops_dev.{silver_fd001_train, gold_fd001_features, gold_fd001_predictions}`
 
 ## 6. Local workspace and tools
@@ -311,8 +332,9 @@ development mode off.
   databricks-sdk 0.140.0. Keep local and cloud versions consistent.
 - Git: branch `main`, author Cheng Huang <cheng.huang.ca@outlook.com>
   (repo-local config), no remote. The latest milestone commit is
-  `5361947` (orchestrated retraining), followed by this handover rewrite. The
-  CI workflow in `.github/workflows/ci.yml` has never run.
+  `5361947` (orchestrated retraining), followed by the handover rewrite
+  `d117085`. The dashboards/Genie milestone is uncommitted until the user asks.
+  The CI workflow in `.github/workflows/ci.yml` has never run.
 
 ## 7. Working agreement that has served well
 

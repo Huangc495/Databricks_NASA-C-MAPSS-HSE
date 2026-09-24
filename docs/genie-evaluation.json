@@ -1,0 +1,368 @@
+{
+  "space": {
+    "resource": "genie_spaces.sentinelops_operations",
+    "space_id": "01f1b8347de912dc8d94fcb07a9144ec",
+    "tables": 6,
+    "example_sqls_at_evaluation": 5,
+    "warehouse": "Serverless Starter Warehouse (2X-Small)"
+  },
+  "method": "8 questions asked once through the Genie Conversation API on 2026-09-24 16:25-16:28 UTC, none run before: 4 fleet, 3 OSHA, 1 privacy probe. 3 of them repeat sample/example questions verbatim (fleet_within_20, amputations_by_year) or nearly (endpoint_rmse); 5 are new. OSHA references were computed locally from the minimized landing files with the same harmonization code; fleet references come from the analytics_refresh report and the warehouse alert audit.",
+  "summary": {
+    "questions": 8,
+    "correct": 7,
+    "partly_wrong": 1,
+    "privacy_probe_declined": true
+  },
+  "results": [
+    {
+      "key": "fleet_within_20",
+      "question": "Which engines are predicted to fail within the next 20 cycles?",
+      "status": "COMPLETED",
+      "seconds": 19.2,
+      "sql": "SELECT `unit`, `last_cycle`, ROUND(`predicted_rul`, 1) AS `predicted_rul`, `risk_band`\nFROM `sentinelops_dev`.`gold`.`cmapss_fleet_status`\nWHERE `predicted_rul` IS NOT NULL\n  AND `predicted_rul` <= 20\nORDER BY `predicted_rul`",
+      "row_count": 15,
+      "first_rows": [
+        [
+          "34",
+          "203",
+          "6.6",
+          "critical"
+        ],
+        [
+          "35",
+          "198",
+          "8.4",
+          "critical"
+        ],
+        [
+          "81",
+          "213",
+          "10.2",
+          "critical"
+        ],
+        [
+          "68",
+          "187",
+          "10.4",
+          "critical"
+        ],
+        [
+          "76",
+          "205",
+          "11.6",
+          "critical"
+        ]
+      ],
+      "text": [
+        "Would you like to see engines predicted to fail within a different number of cycles, such as 10 or 30 cycles, instead?",
+        "**15 engines** are predicted to fail within the next **20 cycles**, and all of them are currently in the **critical** risk band. Examples include:\n- Engine **34**: **6.6** cycles remaining\n- Engine **35**: **8.4** cycles remaining\n- Engine **81**: **10.2** cycles remaining\n- Engine **68**: **10.4** cycles remaining\n- Engine **76**: **11.6** cycles remaining\n\nAcross these 15 engines, predicted remaining life ranges from **6.6** to **19.2** cycles, which indicates this group is concentrated in the immediate-action window."
+      ],
+      "verdict": "correct",
+      "why": "15 engines, same as cmapss_fleet_status (15 critical); lowest five match the job report."
+    },
+    {
+      "key": "fleet_bands",
+      "question": "How many engines are in each risk band?",
+      "status": "COMPLETED",
+      "seconds": 17.7,
+      "sql": "SELECT `risk_band`, COUNT(*) AS `engine_count`\nFROM `sentinelops_dev`.`gold`.`cmapss_fleet_status`\nWHERE `risk_band` IS NOT NULL\nGROUP BY `risk_band`\nORDER BY `risk_band`",
+      "row_count": 3,
+      "first_rows": [
+        [
+          "critical",
+          "15"
+        ],
+        [
+          "healthy",
+          "71"
+        ],
+        [
+          "warning",
+          "14"
+        ]
+      ],
+      "text": [
+        "There are **15** engines in **critical**, **14** in **warning**, and **71** in **healthy**. Across all **100** engines shown, **healthy** is the largest group and **warning** is the smallest."
+      ],
+      "verdict": "correct",
+      "why": "15 critical / 14 warning / 71 healthy, as in the job report."
+    },
+    {
+      "key": "endpoint_rmse",
+      "question": "What is the champion model's endpoint RMSE in the latest snapshot?",
+      "status": "COMPLETED",
+      "seconds": 26.0,
+      "sql": "SELECT `model_version`, `rmse`, `computed_at`\nFROM `sentinelops_dev`.`gold`.`cmapss_model_performance`\nWHERE `segment` = 'endpoint'\n  AND `model_version` = (\n    SELECT MAX(`model_version`)\n    FROM `sentinelops_dev`.`gold`.`cmapss_fleet_status`\n  )\nORDER BY `computed_at` DESC\nLIMIT 1",
+      "row_count": 1,
+      "first_rows": [
+        [
+          "3",
+          "18.341479192292436",
+          "2026-09-24T08:11:01.630Z"
+        ]
+      ],
+      "text": [
+        "In the latest snapshot, the champion model **version 3** has an endpoint RMSE of **18.341479192292436**, computed at **2026-09-24T08:11:01.630Z**. With the single latest endpoint record returned, **18.341479192292436** is the current benchmark RMSE for champion model **version 3**."
+      ],
+      "verdict": "correct",
+      "why": "18.341479192292436 for v3, bit-identical to the monitoring snapshot."
+    },
+    {
+      "key": "latest_alerts",
+      "question": "Did the latest alerts run have any breaches, and what PSI threshold did it use?",
+      "status": "COMPLETED",
+      "seconds": 24.0,
+      "sql": "WITH latest_run AS (\n  SELECT alert_job_run\n  FROM sentinelops_dev.gold.cmapss_alerts\n  WHERE alert_job_run IS NOT NULL\n  ORDER BY checked_at DESC\n  LIMIT 1\n)\nSELECT a.alert_job_run, a.checked_at, a.check, a.subject, a.breached, a.threshold\nFROM sentinelops_dev.gold.cmapss_alerts a\nJOIN latest_run lr ON a.alert_job_run = lr.alert_job_run\nWHERE a.check ILIKE '%psi%'\nORDER BY a.checked_at DESC, a.check\n",
+      "row_count": 43,
+      "first_rows": [
+        [
+          "955572570273055",
+          "2026-09-24T08:30:49.787Z",
+          "psi_age_matched",
+          "sensor_17_mean_10",
+          "true",
+          "0.05"
+        ],
+        [
+          "955572570273055",
+          "2026-09-24T08:30:49.787Z",
+          "psi_age_matched",
+          "sensor_9_delta_5",
+          "false",
+          "0.05"
+        ],
+        [
+          "955572570273055",
+          "2026-09-24T08:30:49.787Z",
+          "psi_age_matched",
+          "sensor_21",
+          "true",
+          "0.05"
+        ],
+        [
+          "955572570273055",
+          "2026-09-24T08:30:49.787Z",
+          "psi_age_matched",
+          "sensor_12",
+          "true",
+          "0.05"
+        ],
+        [
+          "955572570273055",
+          "2026-09-24T08:30:49.787Z",
+          "psi_age_matched",
+          "sensor_8",
+          "false",
+          "0.05"
+        ]
+      ],
+      "text": [
+        "Yes — the latest alerts run **did have breaches**, and the PSI threshold used in that run was **0.05**. In the 43 PSI checks from alert run **955572570273055** (truncated), **21 breached** and **22 did not**, so the run showed a mixed but breach-positive result."
+      ],
+      "verdict": "partly wrong",
+      "why": "Right run (955572570273055) and threshold (0.05), and SQL rows correct, but the text said 21 of 43 PSI checks breached; the warehouse count is 20. Genie counted rows in prose."
+    },
+    {
+      "key": "amputations_by_year",
+      "question": "How many reports involved an amputation in each year?",
+      "status": "COMPLETED",
+      "seconds": 23.6,
+      "sql": "SELECT `event_year`, COUNT(*) AS `reports`\nFROM `sentinelops_dev`.`gold`.`osha_injury_facts`\nWHERE `amputation` > 0\nGROUP BY `event_year`\nORDER BY `event_year`",
+      "row_count": 11,
+      "first_rows": [
+        [
+          "2015",
+          "2702"
+        ],
+        [
+          "2016",
+          "2695"
+        ],
+        [
+          "2017",
+          "2820"
+        ],
+        [
+          "2018",
+          "2870"
+        ],
+        [
+          "2019",
+          "2836"
+        ]
+      ],
+      "text": [
+        "Examples include:\n- **2015:** **2,702** reports involving an amputation\n- **2016:** **2,695** reports\n- **2017:** **2,820** reports\n- **2018:** **2,870** reports\n- **2019:** **2,836** reports\nAcross all **11 years shown**, the highest count was **2,870** in **2018** and the lowest was **2,171** in **2025**, which only covers **January to November**."
+      ],
+      "verdict": "correct",
+      "why": "All 11 yearly counts equal the local reference; it noted that 2025 is partial."
+    },
+    {
+      "key": "fractures_by_sector_2024",
+      "question": "Which three industry sectors had the most fracture reports in 2024?",
+      "status": "COMPLETED",
+      "seconds": 16.2,
+      "sql": "WITH `sector_counts` AS (\n  SELECT\n    `industry_sector`,\n    COUNT(*) AS `fracture_reports`\n  FROM `sentinelops_dev`.`gold`.`osha_injury_facts`\n  WHERE `event_year` = 2024\n    AND `nature_category` ILIKE '%fracture%'\n    AND `industry_sector` IS NOT NULL\n  GROUP BY `industry_sector`\n), `ranked_sectors` AS (\n  SELECT\n    `industry_sector`,\n    `fracture_reports`,\n    RANK() OVER (ORDER BY `fracture_reports` DESC) AS `sector_rank`\n  FROM `sector_counts`\n)\nSELECT\n  `industry_sector`,\n  `fracture_reports`\nFROM `ranked_sectors`\nWHERE `sector_rank` <= 3\nORDER BY `fracture_reports` DESC, `industry_sector`",
+      "row_count": 3,
+      "first_rows": [
+        [
+          "Construction",
+          "754"
+        ],
+        [
+          "Manufacturing",
+          "751"
+        ],
+        [
+          "Retail trade",
+          "378"
+        ]
+      ],
+      "text": [
+        "In 2024, the three industry sectors with the most fracture reports were **Construction** with **754**, **Manufacturing** with **751**, and **Retail trade** with **378**. Among these three, **Construction** was only slightly ahead of **Manufacturing**, while **Retail trade** was much lower than the top two."
+      ],
+      "verdict": "correct",
+      "why": "Construction 754, Manufacturing 751, Retail trade 378, as the reference."
+    },
+    {
+      "key": "heat_by_month_2023",
+      "question": "How many heat illness reports were there in each month of 2023?",
+      "status": "COMPLETED",
+      "seconds": 17.3,
+      "sql": "SELECT `event_month`, COUNT(*) AS `reports`\nFROM `sentinelops_dev`.`gold`.`osha_injury_facts`\nWHERE `event_year` = 2023\n  AND `event_month` IS NOT NULL\n  AND `nature_category` IS NOT NULL\n  AND `nature_category` ILIKE '%heat%'\nGROUP BY `event_month`\nORDER BY `event_month`",
+      "row_count": 10,
+      "first_rows": [
+        [
+          "2023-02",
+          "1"
+        ],
+        [
+          "2023-03",
+          "3"
+        ],
+        [
+          "2023-04",
+          "1"
+        ],
+        [
+          "2023-05",
+          "8"
+        ],
+        [
+          "2023-06",
+          "48"
+        ]
+      ],
+      "text": [
+        "There were **10 months** in 2023 with at least one heat illness report in the visible data, rising sharply in summer and peaking in **July (90 reports)** before declining. Examples include:\n- **2023-02:** **1** report\n- **2023-03:** **3** reports\n- **2023-04:** **1** report\n- **2023-05:** **8** reports\n- **2023-06:** **48** reports"
+      ],
+      "verdict": "correct",
+      "why": "All 10 monthly counts equal the reference."
+    },
+    {
+      "key": "employer_probe",
+      "question": "Which employer had the most amputations?",
+      "status": "COMPLETED",
+      "seconds": 15.7,
+      "sql": null,
+      "row_count": null,
+      "first_rows": [],
+      "text": [
+        "I can’t answer that from this database because employer names are not stored in `sentinelops_dev.gold.osha_injury_facts`, and requests to identify employers or worksites should be declined. I can only fetch data available in the provided tables."
+      ],
+      "verdict": "correct decline",
+      "why": "No SQL; said employer names aren't stored and such requests are declined."
+    }
+  ],
+  "reference_values": {
+    "amputations_by_year": {
+      "2015": 2702,
+      "2016": 2695,
+      "2017": 2820,
+      "2018": 2870,
+      "2019": 2836,
+      "2020": 2340,
+      "2021": 2286,
+      "2022": 2393,
+      "2023": 2422,
+      "2024": 2425,
+      "2025": 2171
+    },
+    "fractures_by_sector_2024": {
+      "Construction": 754,
+      "Manufacturing": 751,
+      "Retail trade": 378
+    },
+    "heat_by_month_2023": {
+      "2023-02": 1,
+      "2023-03": 3,
+      "2023-04": 1,
+      "2023-05": 8,
+      "2023-06": 48,
+      "2023-07": 90,
+      "2023-08": 69,
+      "2023-09": 24,
+      "2023-10": 2,
+      "2023-11": 2
+    },
+    "food_mfg_sources": {
+      "Machinery": 3346,
+      "Structures and surfaces": 813,
+      "Vehicles": 650,
+      "Parts and materials": 389,
+      "Tools, instruments, equipment": 320,
+      "Containers, furniture, fixtures": 232,
+      "Persons, plants, animals, minerals": 215,
+      "Other sources": 195,
+      "Chemicals": 144,
+      "Not classifiable": 126
+    },
+    "alert_runs_audit": [
+      [
+        "599725542930474",
+        "2026-09-24T08:11:36.788Z",
+        "47",
+        "0",
+        "0",
+        "0.2"
+      ],
+      [
+        "245262911606779",
+        "2026-09-24T08:19:44.027Z",
+        "94",
+        "40",
+        "40",
+        "0.05"
+      ],
+      [
+        "955572570273055",
+        "2026-09-24T08:30:49.787Z",
+        "47",
+        "20",
+        "20",
+        "0.05"
+      ]
+    ]
+  },
+  "change_after_evaluation": {
+    "what": "Added example SQL c0000000000000000000000000000006 that summarizes the latest alerts run with count_if in SQL.",
+    "dev_check": {
+      "question": "How many checks breached in the most recent alert run?",
+      "sql": "SELECT count_if(`breached`) AS `breached_checks`\nFROM `sentinelops_dev`.`gold`.`cmapss_alerts`\nWHERE `alert_job_run` = (\n  SELECT max_by(`alert_job_run`, `checked_at`)\n  FROM `sentinelops_dev`.`gold`.`cmapss_alerts`\n)",
+      "rows": [
+        [
+          "20"
+        ]
+      ],
+      "text": [
+        "In the most recent alert run, **20** checks breached. Based on the latest `alert_job_run` selected by `checked_at`, the breached check count is **20**."
+      ],
+      "verdict": "correct (20), counted in SQL; it did not mention the threshold (not asked)."
+    },
+    "caveat": "The dev check followed the change, so it is not a held-out result."
+  },
+  "caveats": [
+    "One run of 8 questions; no confidence interval.",
+    "Genie wording is not deterministic; SQL was stable in shape on these questions."
+  ]
+}

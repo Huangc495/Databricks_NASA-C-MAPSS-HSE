@@ -1,6 +1,19 @@
 # Build status
 
-Last verified: September 24, 2026 (orchestrated retraining and alerts).
+Last verified: September 24, 2026, 16:58 UTC (AI/BI dashboards, Genie and budget alert).
+
+**At a glance.**
+
+- **Progress:** 25 of 38 tracked tasks are done. The real-time serving demo
+  is next; 10 tasks are not started and 2 are deferred.
+- **Live state (read-only checks):** no active job runs, no classic clusters,
+  no Vector Search or custom serving endpoints, and all pipelines IDLE. The
+  starter warehouse is STOPPED (2X-Small, 5-minute auto-stop). `@champion` is
+  v3 (READY).
+- **Cost:** September 24 has CAD 8.05 posted so far and is projected at about
+  CAD 10.6; see "Cost and runtime controls". Start the next billable task on
+  September 25 (UTC) or later.
+- **Git:** the dashboards/Genie milestone isn't committed yet.
 
 ## Task status
 
@@ -14,9 +27,9 @@ cost or prerequisites, with the reason given.
 | Task | Status | Evidence or next action |
 |---|---|---|
 | Azure foundation: ADLS Gen2, workspace, access connector, UC catalog | Done | `infra/main.bicep`; "Azure" section below |
-| Bundle deployment (dev target, strict validation, manual jobs) | Done | `databricks.yml`, `resources/*.yml`; 12 jobs and 2 pipelines deployed; a test enforces job guardrails, including no serverless auto-retries |
+| Bundle deployment (dev target, strict validation, manual jobs) | Done | `databricks.yml`, `resources/*.yml`; 13 jobs, 2 pipelines, 2 dashboards and 1 Genie space deployed; a test enforces job guardrails, including no serverless auto-retries |
 | Cost visibility: meter-level Azure cost query | Done | Found an always-on NAT gateway/IP, ~CAD 1.7/day ("Cost and runtime controls") |
-| Azure budget alert | Not started | Cheap safeguard for the $10/day limit; needs your approval to create |
+| Azure budget alert | Done | Budget `sentinelops-dev-monthly` (your choice): CAD 150/month on both SentinelOps resource groups; emails at 50/80/100% of actual and 100% of forecast; `infra/budget.json`. A tripwire (alerts lag 8–24 h), not a cutoff |
 | Databricks billing tables (`system.billing`) access | Not started | Needs an account/metastore admin grant |
 | dev/staging/prod catalogs, service principals, `run_as` | Not started | After the demo features are complete |
 | Secrets in Key Vault or a secret scope | Not started | Needed once API keys or Event Hubs credentials exist |
@@ -42,7 +55,7 @@ cost or prerequisites, with the reason given.
 | Delayed-label performance and age-matched drift monitoring | Done | `gold.cmapss_model_performance`, `gold.cmapss_feature_drift` |
 | Alerts on drift and performance tables | Done | Task `alerts` in `cmapss_retrain`: relative RMSE, age-matched PSI and freshness thresholds, logged to `gold.cmapss_alerts`; a breach fails the run (breach test run `955572570273055`). No email notification (your choice) |
 | Orchestrated retraining (ingest → verify → train → promote → score) | Done | Job `cmapss_retrain`; retrains only when the Gold training digests differ from the champion's. Unchanged-data run `599725542930474` SUCCESS in 23 min; `cmapss-retrain.json` |
-| Real-time serving demo with Gold-format features | Not started | Bounded demo; delete the endpoint afterwards |
+| Real-time serving demo with Gold-format features | **Next** | Bounded demo with scale-to-zero; needs your go-ahead on a serving endpoint; delete it afterwards |
 | Hyperparameter tuning, `mlflow.evaluate`, sequence baseline | Not started | |
 | Lakehouse Monitoring inference profile | Not started (optional) | Job-computed metrics already cover the demo |
 
@@ -65,18 +78,79 @@ cost or prerequisites, with the reason given.
 
 | Task | Status | Evidence or next action |
 |---|---|---|
-| Unit tests (67) and local CI workflow file | Done (local) | `.github/workflows/ci.yml` has never run: no remote |
-| Git history | Done (local) | Branch `main`; no remote |
+| Unit tests (82) and local CI workflow file | Done (local) | `.github/workflows/ci.yml` has never run: no remote |
+| Git history | Done (local) | Branch `main`; no remote. The dashboards/Genie milestone is not committed yet |
 | GitHub repository, CI runs, OIDC deployment to staging/prod | Not started | Needs your choice of repository and visibility |
-| AI/BI dashboard and Genie space | **Next** | Viewing uses SQL warehouse time: needs your go-ahead on warehouse use |
+| AI/BI dashboards and Genie space | Done | Fleet health and Safety incidents dashboards, Genie space over 6 curated Gold tables, `analytics_refresh` job; Genie 7/8 held-out questions fully right (one miscounted summary); [ANALYTICS.md](ANALYTICS.md) |
+| SQL warehouse right-sizing | Done | Starter warehouse Small → 2X-Small, auto-stop 10 → 5 min (your approval); a wake-up now costs ~CAD 0.35, not ~2.3 |
 | Demo script and portfolio write-up | Not started | Last |
 
-Recommended order (details in HANDOVER.md section 3): an Azure budget alert at
-any time → dashboard/Genie → serving demo → a larger answer evaluation, before
-any assistant deployment → API/streaming sources → environments and CI/CD →
-optional ML depth → demo script and write-up.
+Recommended order (details in HANDOVER.md section 3): serving demo → a larger
+answer evaluation, before any assistant deployment → API/streaming sources →
+environments and CI/CD → optional ML depth → demo script and write-up. The
+budget alert and dashboards/Genie are done.
 
-## Current milestone: orchestrated retraining and alerts (C-MAPSS)
+## Current milestone: AI/BI dashboards, Genie and a budget alert
+
+Two AI/BI dashboards and a Genie space are now bundle resources. They are backed
+by two new Gold marts and checked on serverless compute before any warehouse
+use. Details: [ANALYTICS.md](ANALYTICS.md).
+
+- **Budget alert (Task 0).** Budget `sentinelops-dev-monthly`, CAD 150/month
+  (your choice), scoped to `rg-sentinelops-dev` and
+  `rg-sentinelops-dev-managed`. It emails cheng.huang.ca@outlook.com at 50%,
+  80% and 100% of actual spend and at 100% of forecast. It is free, and the
+  definition is in `infra/budget.json`.
+- **Cost finding.** CAD 2.42 of serverless SQL posted for September 24 came
+  from browsing sample data in Catalog Explorer (05:44 UTC), which starts the
+  starter warehouse. The warehouse was Small (12 DBU/h) with a 10-minute
+  auto-stop. With your approval it is now **2X-Small (4 DBU/h), 5-minute
+  auto-stop**.
+- **`analytics_refresh`** (`847239470140874`), run `429694746857912`
+  **SUCCESS** in 7.5 min, no SQL warehouse:
+  - `gold.osha_injury_facts`: 105,993 rows with harmonized categories and no
+    narratives;
+  - `gold.cmapss_fleet_status`: 100 engines scored by v3: 15 critical, 14
+    warning, 71 healthy;
+  - comments on the monitoring tables for Genie;
+  - all 7 dashboard datasets and all 5 Genie example queries executed, with
+    widget columns checked.
+  - The facts matched a local rehearsal exactly, including the extraction
+    evaluation's harmonization counts (69 / 3,932 / 371).
+- **Dashboards** Fleet health (17 widgets) and Safety incidents (14 widgets)
+  are published with viewer credentials. The render check in the browser
+  (after your sign-in) found three problems, all fixed:
+  - spec-v1 tables that showed "no fields selected";
+  - more than 10 color series, which reuse colors;
+  - scrolling title boxes.
+- **Genie** (`01f1b8347de912dc8d94fcb07a9144ec`): on 8 held-out questions,
+  6 answers were fully correct and the employer-identification probe was
+  correctly declined. The eighth answer ran the right SQL, but its summary
+  miscounted breaches as 21; the true count is 20. After I added an example
+  that counts in SQL, a dev paraphrase returned 20. Evidence:
+  [genie-evaluation.json](genie-evaluation.json).
+- **Cost:**
+  - about 23 billed warehouse minutes (≈ 1.55 DBU ≈ CAD 1.5), in two sessions;
+  - about 7.5 minutes of serverless job time (≈ CAD 0.12);
+  - Genie's LLM use is free through January 31, 2027.
+- **Day total, September 24 (UTC).** By 16:55 UTC, CAD 8.05 had posted,
+  covering usage to about 11:00 UTC:
+  - serverless jobs 2.60;
+  - serverless SQL 2.42 (the Catalog Explorer browse);
+  - model calls 2.23 (the morning's evaluations);
+  - NAT and IP 0.76.
+  - Adding the remaining fixed cost (about 0.9) and this milestone (about 1.6),
+    the **projected total is about CAD 10.6**. That is slightly over the limit
+    if $10/day means CAD; it is within USD 10. The monthly budget alert won't
+    fire on one day, so no further billable work was started on September 24.
+- **Known quirk:** every deploy "updates" `cmapss_ingest`, `osha_ingest` and
+  `cmapss_retrain` with identical settings, because the Jobs API doesn't echo
+  `disable_auto_optimization` on pipeline tasks. It's harmless.
+- Tests: 82 pass (15 new): facts and harmonized names, risk bands, fleet status,
+  DDL quoting, dashboard consistency and tables, color-series cardinality, DOL
+  attribution, and the Genie serialized-space format rules.
+
+## Earlier milestone: orchestrated retraining and alerts (C-MAPSS)
 
 One manual job, `cmapss_retrain` (`1037945637149770`), now runs the whole loop:
 ingest → verify → train → promote → score → monitor → alerts. Details:
@@ -497,34 +571,37 @@ section is kept only so older links still resolve.
 
 ## Cost and runtime controls
 
-- Approved operating budget: up to $10/day; no hard daily billing cutoff exists.
-- Last compute inventory found no classic clusters and a stopped starter SQL
-  warehouse with a 10-minute auto-stop setting.
-- No recurring job schedule or persistent serving/Vector Search endpoints.
-- Azure Cost Management now reports CAD 0.434912152 for September 23 across the
-  two project resource groups. Billing is delayed; this does not prove the final
-  daily total is within budget. Recheck using `infra/cost-query.json`.
-  `system.billing` is inaccessible to this user. No automated budget alert or
-  hard cutoff has been configured.
-- Serverless wall-clock on September 23 (UTC), including resource waits:
-  ~49 minutes before this milestone, plus ~36 minutes for it (ingest 12.2 +
-  verify 6.3 + ingest 11.2 + train 6.5). Azure still posted CAD 0.434912152
-  afterwards, which reflects billing delay rather than actual usage. The
-  project has never had a usage view that confirms the daily total; an
-  account/metastore admin granting read access to `system.billing` would fix that.
-- By 17:15 UTC, cost posted for September 23 had reached **CAD 1.02**; a query
-  grouped by meter covered usage up to about 08:00 UTC:
-  - serverless compute: 0.687 DBU = CAD 0.43, about **CAD 0.62/DBU**, roughly
-    1.5 DBU per hour of job wall-clock;
-  - **a NAT gateway and a static public IP in the managed resource group bill
-    24/7**, about CAD 0.07/hour, or **~CAD 1.7/day even with no compute**. They
-    come from the workspace's secure-cluster-connectivity networking, which only
-    classic compute uses; serverless does not use them. Keep this fixed cost in
-    the daily budget;
-  - storage and bandwidth are negligible.
-- The operational-ML milestone added ~25 minutes of serverless wall-clock
-  (promote 6.4, score+monitor 9.3, idempotency rerun 7.3). Projected September 23
-  total: roughly CAD 3–4, under the $10/day limit.
+- **Limit:** the approved operating budget is up to $10/day, treated as CAD
+  (the conservative reading). There is no hard daily cutoff. Budget
+  `sentinelops-dev-monthly` (CAD 150/month, both resource groups) emails at
+  50%, 80% and 100% of actual spend and at 100% of forecast. Budgets alert;
+  they don't stop spending.
+- **Posted cost by day** (UTC; `infra/cost-query.json`, both resource groups).
+  Billing lags about 9 hours, so recheck later figures before trusting them.
+
+  | Day | Posted | By meter | Notes |
+  |---|---|---|---|
+  | September 23 | CAD 5.41 (final) | Serverless SQL 2.16, serverless jobs 1.85, NAT and IP 1.31 (19 h) | The projection of CAD 3–4 missed a Catalog Explorer browse at 19:23 UTC, which ran the Small warehouse for about 11 minutes (2.2 DBU) |
+  | September 24 | CAD 8.05 by 16:55 UTC (usage to ~11:00) | Serverless jobs 2.60, serverless SQL 2.42 (Catalog Explorer, 05:44), model calls 2.23, NAT and IP 0.76 | Projected ≈ CAD 10.6 after the remaining fixed cost (~0.9) and this milestone (~1.6): slightly over CAD 10, within USD 10 |
+
+- **Rates** (Azure Retail Prices, `westus2`, CAD):
+  - serverless jobs CAD 0.62/DBU (about 1.5 DBU per hour of job time);
+  - serverless SQL CAD 0.97/DBU (the 2X-Small warehouse is 4 DBU/h);
+  - model serving CAD 0.097/DBU.
+- **Fixed cost:** a NAT gateway and a static public IP in the managed resource
+  group bill 24/7, about CAD 0.07/hour or **~CAD 1.7/day with no compute**.
+  They come from the workspace's secure-cluster-connectivity networking, which
+  only classic compute uses. Storage and bandwidth are negligible.
+- **Biggest avoidable cost found:** opening sample data in Catalog Explorer
+  starts the SQL warehouse. It cost CAD 2.16 and 2.42 on the two days, at the
+  old Small size. The warehouse is now 2X-Small with a 5-minute auto-stop
+  (about CAD 0.35 per wake-up).
+- **Compute controls:** no classic clusters, no recurring job schedules, and
+  no persistent serving or Vector Search endpoints. Every job is manual, with
+  timeouts and zero retries.
+- **Visibility gap:** `system.billing` is inaccessible to this user, so there
+  is no near-real-time usage view. An account or metastore admin granting read
+  access would fix that.
 
 The local benchmark demonstrates predictive performance on simulated engines.
 It is not evidence of reduced real-world downtime or an operational safety system.

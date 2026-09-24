@@ -10,6 +10,10 @@ variables:
     default: sentinelops_dev
   schema:
     default: sentinelops_dev
+  warehouse_id:
+    description: SQL warehouse for AI/BI dashboards and Genie (2X-Small, 5-minute auto-stop)
+    lookup:
+      warehouse: Serverless Starter Warehouse
 sync:
   include:
     - src/**

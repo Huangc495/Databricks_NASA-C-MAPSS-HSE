@@ -1,0 +1,48 @@
+{
+  "properties": {
+    "category": "Cost",
+    "amount": 150,
+    "timeGrain": "Monthly",
+    "timePeriod": {
+      "startDate": "2026-09-01T00:00:00Z",
+      "endDate": "2027-08-31T00:00:00Z"
+    },
+    "filter": {
+      "dimensions": {
+        "name": "ResourceGroupName",
+        "operator": "In",
+        "values": ["rg-sentinelops-dev", "rg-sentinelops-dev-managed"]
+      }
+    },
+    "notifications": {
+      "actual_gt_50": {
+        "enabled": true,
+        "operator": "GreaterThan",
+        "threshold": 50,
+        "thresholdType": "Actual",
+        "contactEmails": ["cheng.huang.ca@outlook.com"]
+      },
+      "actual_gt_80": {
+        "enabled": true,
+        "operator": "GreaterThan",
+        "threshold": 80,
+        "thresholdType": "Actual",
+        "contactEmails": ["cheng.huang.ca@outlook.com"]
+      },
+      "actual_gt_100": {
+        "enabled": true,
+        "operator": "GreaterThan",
+        "threshold": 100,
+        "thresholdType": "Actual",
+        "contactEmails": ["cheng.huang.ca@outlook.com"]
+      },
+      "forecast_gt_100": {
+        "enabled": true,
+        "operator": "GreaterThan",
+        "threshold": 100,
+        "thresholdType": "Forecasted",
+        "contactEmails": ["cheng.huang.ca@outlook.com"]
+      }
+    }
+  }
+}

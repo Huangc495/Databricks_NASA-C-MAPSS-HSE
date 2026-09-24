@@ -108,7 +108,16 @@ this timeout reduces exposure but is not a hard billing cap.
    model on three fields (≈ 0.94 accuracy) but trails on source (0.76 vs 0.83).
    See [docs/SAFETY_RAG.md](docs/SAFETY_RAG.md). Data courtesy of the U.S.
    Department of Labor (OSHA); no endorsement implied.
-4. Add Event Hubs/API sources, dashboard/Genie and OIDC staging/production CI/CD.
+4. Self-service analytics. Done: two AI/BI dashboards (Fleet health, Safety
+   incidents) and a Genie space over six curated Gold tables, all bundle
+   resources. The manual job `analytics_refresh` builds `gold.osha_injury_facts`
+   (harmonized injury categories, no narratives) and `gold.cmapss_fleet_status`
+   (the champion's RUL outlook per engine). It also runs every dashboard and
+   Genie example query on serverless compute before any SQL warehouse time is
+   used. On 8 held-out questions, Genie gave 6 fully correct answers, declined
+   the employer-identification probe, and miscounted one summary. See
+   [docs/ANALYTICS.md](docs/ANALYTICS.md).
+5. Add Event Hubs/API sources and OIDC staging/production CI/CD.
 
 Dataset provenance: NASA PCoE, [Zenodo record 15346912](https://zenodo.org/records/15346912),
 DOI 10.5281/zenodo.15346912, archive MD5 `79a22f36e80606c69d0e9e4da5bb2b7a`.
@@ -122,5 +131,7 @@ Inspect the cloud verification run with
 `./scripts/Inspect-Run.ps1 -RunId 99784281689509`.
 The optional `docs/cost-review.sql` query estimates Databricks list-price usage;
 it still needs execution against system billing tables and does not include
-Azure storage or network charges. No automated budget alert or hard spending
-cutoff has been configured.
+Azure storage or network charges. An Azure budget (`infra/budget.json`, CAD
+150/month on the two SentinelOps resource groups) emails alerts at 50%, 80% and
+100% of actual spend and at 100% of forecast. It is not a hard spending cutoff.
+The starter SQL warehouse is 2X-Small with a 5-minute auto-stop.

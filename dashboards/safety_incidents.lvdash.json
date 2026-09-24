@@ -1,0 +1,791 @@
+{
+  "datasets": [
+    {
+      "name": "injuries",
+      "displayName": "OSHA injury facts",
+      "queryLines": [
+        "SELECT event_date, event_year, coding_era, state, industry_sector, event_category, nature_category,\n",
+        "  body_part_category, source_category, hospitalized,\n",
+        "  CASE WHEN nature_category IN ('Fracture', 'Amputation', 'Unspecified', 'Cut or puncture', 'Burn',\n",
+        "    'Concussion or brain injury', 'Sprain, strain or bruise', 'Heat illness', 'Crushing injury')\n",
+        "    THEN nature_category ELSE 'Other injury types' END AS nature_group,\n",
+        "  CASE WHEN amputation > 0 THEN 1 ELSE 0 END AS amputation_report,\n",
+        "  CASE WHEN loss_of_eye > 0 THEN 1 ELSE 0 END AS loss_of_eye_report\n",
+        "FROM gold.osha_injury_facts"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "safety_incidents",
+      "displayName": "Safety incidents",
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layout": [
+        {
+          "widget": {
+            "name": "safety_title",
+            "multilineTextboxSpec": {
+              "lines": [
+                "# SentinelOps safety incidents\n\n",
+                "OSHA Severe Injury Reports: incidents reported to federal OSHA (hospitalization, amputation or loss of an eye), January 2015 to November 2025. Categories are OIICS divisions harmonized across OSHA's 2024 coding change. **Source: U.S. Department of Labor, Occupational Safety and Health Administration. No endorsement is implied.**"
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 6,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "date_filter",
+            "queries": [
+              {
+                "name": "filter_date_filter_injuries",
+                "query": {
+                  "datasetName": "injuries",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "name": "event_date",
+                      "expression": "`event_date`"
+                    },
+                    {
+                      "name": "event_date_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-date-range-picker",
+              "frame": {
+                "showTitle": true,
+                "title": "Incident month"
+              },
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "event_date",
+                    "displayName": "Incident month",
+                    "queryName": "filter_date_filter_injuries"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 3,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "sector_filter",
+            "queries": [
+              {
+                "name": "filter_sector_filter_injuries",
+                "query": {
+                  "datasetName": "injuries",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "name": "industry_sector",
+                      "expression": "`industry_sector`"
+                    },
+                    {
+                      "name": "industry_sector_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "frame": {
+                "showTitle": true,
+                "title": "Industry sector"
+              },
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "industry_sector",
+                    "displayName": "Industry sector",
+                    "queryName": "filter_sector_filter_injuries"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 3,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "state_filter",
+            "queries": [
+              {
+                "name": "filter_state_filter_injuries",
+                "query": {
+                  "datasetName": "injuries",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "name": "state",
+                      "expression": "`state`"
+                    },
+                    {
+                      "name": "state_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "frame": {
+                "showTitle": true,
+                "title": "State"
+              },
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "state",
+                    "displayName": "State",
+                    "queryName": "filter_state_filter_injuries"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 3,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_reports",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "injuries",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "name": "count(*)",
+                      "expression": "COUNT(`*`)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "count(*)",
+                  "displayName": "Reports"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Reports"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 4,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_amputations",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "injuries",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "name": "sum(amputation_report)",
+                      "expression": "SUM(`amputation_report`)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(amputation_report)",
+                  "displayName": "Reports with an amputation"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Reports with an amputation"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 4,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_eyes",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "injuries",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "name": "sum(loss_of_eye_report)",
+                      "expression": "SUM(`loss_of_eye_report`)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "sum(loss_of_eye_report)",
+                  "displayName": "Reports with loss of an eye"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Reports with loss of an eye"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 4,
+            "width": 2,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "monthly_by_event",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "injuries",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "name": "monthly(event_date)",
+                      "expression": "DATE_TRUNC(\"MONTH\", `event_date`)"
+                    },
+                    {
+                      "name": "count(*)",
+                      "expression": "COUNT(`*`)"
+                    },
+                    {
+                      "name": "event_category",
+                      "expression": "`event_category`"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "monthly(event_date)",
+                  "displayName": "Month",
+                  "scale": {
+                    "type": "temporal"
+                  },
+                  "axis": {
+                    "title": "Incident month"
+                  }
+                },
+                "y": {
+                  "fieldName": "count(*)",
+                  "displayName": "Reports",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "axis": {
+                    "title": "Reports"
+                  }
+                },
+                "color": {
+                  "fieldName": "event_category",
+                  "displayName": "Event",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Reports per month by event"
+              },
+              "mark": {
+                "colors": [
+                  "#077A9D",
+                  "#FFAB00",
+                  "#00A972",
+                  "#FF3621",
+                  "#8BCAE7",
+                  "#AB4057",
+                  "#99DDB4",
+                  "#FCA4A1",
+                  "#919191",
+                  "#BF7080"
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 6,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "by_nature",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "injuries",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "name": "nature_category",
+                      "expression": "`nature_category`"
+                    },
+                    {
+                      "name": "count(*)",
+                      "expression": "COUNT(`*`)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "count(*)",
+                  "displayName": "Reports",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "axis": {
+                    "title": "Reports"
+                  }
+                },
+                "y": {
+                  "fieldName": "nature_category",
+                  "displayName": "Injury type",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "axis": {
+                    "title": "Injury type"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Injury type",
+                "showDescription": true,
+                "description": "Unspecified: OSHA's own title is nonspecific"
+              },
+              "mark": {
+                "colors": [
+                  "#077A9D",
+                  "#FFAB00",
+                  "#00A972",
+                  "#FF3621",
+                  "#8BCAE7",
+                  "#AB4057",
+                  "#99DDB4",
+                  "#FCA4A1",
+                  "#919191",
+                  "#BF7080"
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 12,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "by_body_part",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "injuries",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "name": "body_part_category",
+                      "expression": "`body_part_category`"
+                    },
+                    {
+                      "name": "count(*)",
+                      "expression": "COUNT(`*`)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "count(*)",
+                  "displayName": "Reports",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "axis": {
+                    "title": "Reports"
+                  }
+                },
+                "y": {
+                  "fieldName": "body_part_category",
+                  "displayName": "Body part",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "axis": {
+                    "title": "Body part"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Body part"
+              },
+              "mark": {
+                "colors": [
+                  "#077A9D",
+                  "#FFAB00",
+                  "#00A972",
+                  "#FF3621",
+                  "#8BCAE7",
+                  "#AB4057",
+                  "#99DDB4",
+                  "#FCA4A1",
+                  "#919191",
+                  "#BF7080"
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 12,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "by_source",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "injuries",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "name": "source_category",
+                      "expression": "`source_category`"
+                    },
+                    {
+                      "name": "count(*)",
+                      "expression": "COUNT(`*`)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "count(*)",
+                  "displayName": "Reports",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "axis": {
+                    "title": "Reports"
+                  }
+                },
+                "y": {
+                  "fieldName": "source_category",
+                  "displayName": "Source",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "axis": {
+                    "title": "Source"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Source of injury"
+              },
+              "mark": {
+                "colors": [
+                  "#077A9D",
+                  "#FFAB00",
+                  "#00A972",
+                  "#FF3621",
+                  "#8BCAE7",
+                  "#AB4057",
+                  "#99DDB4",
+                  "#FCA4A1",
+                  "#919191",
+                  "#BF7080"
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 18,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "by_sector",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "injuries",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "name": "industry_sector",
+                      "expression": "`industry_sector`"
+                    },
+                    {
+                      "name": "count(*)",
+                      "expression": "COUNT(`*`)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "count(*)",
+                  "displayName": "Reports",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "axis": {
+                    "title": "Reports"
+                  }
+                },
+                "y": {
+                  "fieldName": "industry_sector",
+                  "displayName": "Industry sector",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "axis": {
+                    "title": "Industry sector"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Industry sector (NAICS)"
+              },
+              "mark": {
+                "colors": [
+                  "#077A9D",
+                  "#FFAB00",
+                  "#00A972",
+                  "#FF3621",
+                  "#8BCAE7",
+                  "#AB4057",
+                  "#99DDB4",
+                  "#FCA4A1",
+                  "#919191",
+                  "#BF7080"
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 18,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "yearly_by_nature",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "injuries",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "name": "event_year",
+                      "expression": "`event_year`"
+                    },
+                    {
+                      "name": "count(*)",
+                      "expression": "COUNT(`*`)"
+                    },
+                    {
+                      "name": "nature_group",
+                      "expression": "`nature_group`"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "event_year",
+                  "displayName": "Year",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "axis": {
+                    "title": "Incident year"
+                  }
+                },
+                "y": {
+                  "fieldName": "count(*)",
+                  "displayName": "Reports",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "axis": {
+                    "title": "Reports"
+                  }
+                },
+                "color": {
+                  "fieldName": "nature_group",
+                  "displayName": "Injury type",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Reports per year by injury type",
+                "showDescription": true,
+                "description": "2025 covers January to November; the four smallest types are grouped as Other"
+              },
+              "mark": {
+                "colors": [
+                  "#077A9D",
+                  "#FFAB00",
+                  "#00A972",
+                  "#FF3621",
+                  "#8BCAE7",
+                  "#AB4057",
+                  "#99DDB4",
+                  "#FCA4A1",
+                  "#919191",
+                  "#BF7080"
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 24,
+            "width": 6,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "safety_notes",
+            "multilineTextboxSpec": {
+              "lines": [
+                "**Notes.** One row per report (incident), not per injured worker. Severe injuries reported to federal OSHA only. Employer names, addresses and narratives were removed before upload, and nothing here identifies a worker or employer. Harmonization rules: `sentinelops.extraction` and `sentinelops.analytics`."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 30,
+            "width": 6,
+            "height": 2
+          }
+        }
+      ]
+    }
+  ]
+}

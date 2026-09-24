@@ -1,0 +1,1038 @@
+{
+  "datasets": [
+    {
+      "name": "fleet_kpis",
+      "displayName": "Fleet KPIs",
+      "queryLines": [
+        "SELECT\n",
+        "  (SELECT count(*) FROM gold.cmapss_fleet_status) AS engines,\n",
+        "  (SELECT count_if(risk_band = 'critical') FROM gold.cmapss_fleet_status) AS critical_engines,\n",
+        "  (SELECT count_if(risk_band = 'warning') FROM gold.cmapss_fleet_status) AS warning_engines,\n",
+        "  (SELECT max(model_version) FROM gold.cmapss_fleet_status) AS champion_version,\n",
+        "  (SELECT max_by(rmse, computed_at) FROM gold.cmapss_model_performance\n",
+        "    WHERE segment = 'endpoint' AND model_version = (SELECT max(model_version) FROM gold.cmapss_fleet_status)) AS endpoint_rmse,\n",
+        "  (SELECT count_if(breached) FROM gold.cmapss_alerts\n",
+        "    WHERE alert_job_run = (SELECT max_by(alert_job_run, checked_at) FROM gold.cmapss_alerts)) AS latest_breaches"
+      ]
+    },
+    {
+      "name": "fleet_status",
+      "displayName": "Fleet status",
+      "queryLines": [
+        "SELECT unit, last_cycle, round(predicted_rul, 1) AS predicted_rul, risk_band,\n",
+        "  CASE risk_band WHEN 'critical' THEN '1 critical (<= 20)' WHEN 'warning' THEN '2 warning (21-50)'\n",
+        "    ELSE '3 healthy (> 50)' END AS risk_label,\n",
+        "  actual_rul, model_version\n",
+        "FROM gold.cmapss_fleet_status\n",
+        "ORDER BY predicted_rul, unit"
+      ]
+    },
+    {
+      "name": "at_risk_trajectories",
+      "displayName": "Predicted RUL of the five most at-risk engines",
+      "queryLines": [
+        "WITH at_risk AS (\n",
+        "  SELECT unit FROM gold.cmapss_fleet_status ORDER BY predicted_rul, unit LIMIT 5)\n",
+        "SELECT concat('Engine ', lpad(CAST(p.unit AS STRING), 3, '0')) AS engine, p.cycle, p.predicted_rul\n",
+        "FROM gold.cmapss_predictions p JOIN at_risk USING (unit)\n",
+        "WHERE p.model_version = (SELECT max(model_version) FROM gold.cmapss_fleet_status) AND p.subset = 'FD001' AND p.split = 'test'"
+      ]
+    },
+    {
+      "name": "latest_performance",
+      "displayName": "Latest performance snapshot",
+      "queryLines": [
+        "SELECT segment, rows, round(rmse, 2) AS rmse, round(mae, 2) AS mae, round(bias, 2) AS bias, model_version, computed_at,\n",
+        "  CASE segment WHEN 'endpoint' THEN 1 WHEN 'actual_le_125' THEN 2 WHEN 'all' THEN 3 ELSE 4 END AS segment_order\n",
+        "FROM gold.cmapss_model_performance\n",
+        "WHERE model_version = (SELECT max(model_version) FROM gold.cmapss_fleet_status)\n",
+        "  AND computed_at = (SELECT max(computed_at) FROM gold.cmapss_model_performance WHERE model_version = (SELECT max(model_version) FROM gold.cmapss_fleet_status))\n",
+        "ORDER BY segment_order, segment"
+      ]
+    },
+    {
+      "name": "latest_drift",
+      "displayName": "Latest drift snapshot",
+      "queryLines": [
+        "SELECT feature, round(psi, 3) AS raw_psi, round(psi_age_matched, 3) AS psi_age_matched, computed_at\n",
+        "FROM gold.cmapss_feature_drift\n",
+        "WHERE computed_at = (SELECT max(computed_at) FROM gold.cmapss_feature_drift)\n",
+        "ORDER BY psi_age_matched DESC"
+      ]
+    },
+    {
+      "name": "alert_runs",
+      "displayName": "Alert runs",
+      "queryLines": [
+        "SELECT alert_job_run, min(checked_at) AS checked_at, max(model_version) AS model_version, count(*) AS checks,\n",
+        "  count_if(breached) AS breaches,\n",
+        "  max(CASE WHEN `check` = 'psi_age_matched' THEN threshold END) AS psi_threshold,\n",
+        "  max(CASE WHEN `check` = 'rmse_increase' THEN threshold END) AS rmse_increase_threshold\n",
+        "FROM gold.cmapss_alerts\n",
+        "GROUP BY alert_job_run\n",
+        "ORDER BY checked_at DESC"
+      ]
+    }
+  ],
+  "pages": [
+    {
+      "name": "fleet_health",
+      "displayName": "Fleet health",
+      "pageType": "PAGE_TYPE_CANVAS",
+      "layout": [
+        {
+          "widget": {
+            "name": "fleet_title",
+            "multilineTextboxSpec": {
+              "lines": [
+                "# SentinelOps fleet health\n\n",
+                "Simulated turbofan fleet (NASA C-MAPSS FD001): NASA's 100 test engines play the in-service fleet. Predictions come from the Unity Catalog **@champion** model, scored in batch from Spark-computed Gold features. RUL = remaining useful life in operating cycles."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 0,
+            "width": 6,
+            "height": 3
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_engines",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "fleet_kpis",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "name": "engines",
+                      "expression": "SUM(`engines`)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "engines",
+                  "displayName": "Fleet engines"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Fleet engines"
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 3,
+            "width": 1,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_critical",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "fleet_kpis",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "name": "critical_engines",
+                      "expression": "SUM(`critical_engines`)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "critical_engines",
+                  "displayName": "Critical (RUL <= 20)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Critical (RUL <= 20)"
+              }
+            }
+          },
+          "position": {
+            "x": 1,
+            "y": 3,
+            "width": 1,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_warning",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "fleet_kpis",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "name": "warning_engines",
+                      "expression": "SUM(`warning_engines`)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "warning_engines",
+                  "displayName": "Warning (RUL 21-50)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Warning (RUL 21-50)"
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 3,
+            "width": 1,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_champion",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "fleet_kpis",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "name": "champion_version",
+                      "expression": "MAX(`champion_version`)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "champion_version",
+                  "displayName": "Champion version"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Champion version"
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 3,
+            "width": 1,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_rmse",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "fleet_kpis",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "name": "endpoint_rmse",
+                      "expression": "MAX(`endpoint_rmse`)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "endpoint_rmse",
+                  "displayName": "Endpoint RMSE (cycles)"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Endpoint RMSE (cycles)",
+                "showDescription": true,
+                "description": "Official benchmark: last observed cycle per engine, latest monitoring snapshot"
+              }
+            }
+          },
+          "position": {
+            "x": 4,
+            "y": 3,
+            "width": 1,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "kpi_breaches",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "fleet_kpis",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "name": "latest_breaches",
+                      "expression": "SUM(`latest_breaches`)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "counter",
+              "encodings": {
+                "value": {
+                  "fieldName": "latest_breaches",
+                  "displayName": "Breaches, latest alert run"
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Breaches, latest alert run"
+              }
+            }
+          },
+          "position": {
+            "x": 5,
+            "y": 3,
+            "width": 1,
+            "height": 2
+          }
+        },
+        {
+          "widget": {
+            "name": "risk_filter",
+            "queries": [
+              {
+                "name": "filter_risk_filter_fleet_status",
+                "query": {
+                  "datasetName": "fleet_status",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "name": "risk_label",
+                      "expression": "`risk_label`"
+                    },
+                    {
+                      "name": "risk_label_associativity",
+                      "expression": "COUNT_IF(`associative_filter_predicate_group`)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "filter-multi-select",
+              "frame": {
+                "showTitle": true,
+                "title": "Risk band"
+              },
+              "encodings": {
+                "fields": [
+                  {
+                    "fieldName": "risk_label",
+                    "displayName": "Risk band",
+                    "queryName": "filter_risk_filter_fleet_status"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 5,
+            "width": 2,
+            "height": 1
+          }
+        },
+        {
+          "widget": {
+            "name": "engines_by_band",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "fleet_status",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "name": "risk_label",
+                      "expression": "`risk_label`"
+                    },
+                    {
+                      "name": "count(*)",
+                      "expression": "COUNT(`*`)"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "bar",
+              "encodings": {
+                "x": {
+                  "fieldName": "risk_label",
+                  "displayName": "Risk band",
+                  "scale": {
+                    "type": "categorical"
+                  },
+                  "axis": {
+                    "title": "Risk band"
+                  }
+                },
+                "y": {
+                  "fieldName": "count(*)",
+                  "displayName": "Engines",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "axis": {
+                    "title": "Engines"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Engines by risk band",
+                "showDescription": true,
+                "description": "Illustrative planning thresholds, not a validated maintenance policy"
+              },
+              "mark": {
+                "colors": [
+                  "#077A9D",
+                  "#FFAB00",
+                  "#00A972",
+                  "#FF3621",
+                  "#8BCAE7",
+                  "#AB4057",
+                  "#99DDB4",
+                  "#FCA4A1",
+                  "#919191",
+                  "#BF7080"
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 6,
+            "width": 2,
+            "height": 5
+          }
+        },
+        {
+          "widget": {
+            "name": "engines_table",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "fleet_status",
+                  "disaggregated": true,
+                  "fields": [
+                    {
+                      "name": "unit",
+                      "expression": "`unit`"
+                    },
+                    {
+                      "name": "last_cycle",
+                      "expression": "`last_cycle`"
+                    },
+                    {
+                      "name": "predicted_rul",
+                      "expression": "`predicted_rul`"
+                    },
+                    {
+                      "name": "risk_band",
+                      "expression": "`risk_band`"
+                    },
+                    {
+                      "name": "actual_rul",
+                      "expression": "`actual_rul`"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "frame": {
+                "showTitle": true,
+                "title": "Engines by predicted RUL",
+                "showDescription": true,
+                "description": "Sort by Predicted RUL for the engines closest to failure; actual RUL arrives later"
+              },
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "unit",
+                    "displayName": "Engine"
+                  },
+                  {
+                    "fieldName": "last_cycle",
+                    "displayName": "Last cycle"
+                  },
+                  {
+                    "fieldName": "predicted_rul",
+                    "displayName": "Predicted RUL"
+                  },
+                  {
+                    "fieldName": "risk_band",
+                    "displayName": "Risk band"
+                  },
+                  {
+                    "fieldName": "actual_rul",
+                    "displayName": "Actual RUL (delayed label)"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 2,
+            "y": 5,
+            "width": 4,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "trajectories",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "at_risk_trajectories",
+                  "disaggregated": false,
+                  "fields": [
+                    {
+                      "name": "cycle",
+                      "expression": "`cycle`"
+                    },
+                    {
+                      "name": "predicted_rul",
+                      "expression": "AVG(`predicted_rul`)"
+                    },
+                    {
+                      "name": "engine",
+                      "expression": "`engine`"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "line",
+              "encodings": {
+                "x": {
+                  "fieldName": "cycle",
+                  "displayName": "Cycle",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "axis": {
+                    "title": "Operating cycle"
+                  }
+                },
+                "y": {
+                  "fieldName": "predicted_rul",
+                  "displayName": "Predicted RUL",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "axis": {
+                    "title": "Predicted RUL (cycles)"
+                  }
+                },
+                "color": {
+                  "fieldName": "engine",
+                  "displayName": "Engine",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Predicted RUL over time: five most at-risk engines"
+              },
+              "mark": {
+                "colors": [
+                  "#077A9D",
+                  "#FFAB00",
+                  "#00A972",
+                  "#FF3621",
+                  "#8BCAE7",
+                  "#AB4057",
+                  "#99DDB4",
+                  "#FCA4A1",
+                  "#919191",
+                  "#BF7080"
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 11,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "endpoint_accuracy",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "fleet_status",
+                  "disaggregated": true,
+                  "fields": [
+                    {
+                      "name": "actual_rul",
+                      "expression": "`actual_rul`"
+                    },
+                    {
+                      "name": "predicted_rul",
+                      "expression": "`predicted_rul`"
+                    },
+                    {
+                      "name": "risk_band",
+                      "expression": "`risk_band`"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "scatter",
+              "encodings": {
+                "x": {
+                  "fieldName": "actual_rul",
+                  "displayName": "Actual RUL",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "axis": {
+                    "title": "Actual RUL at last cycle"
+                  }
+                },
+                "y": {
+                  "fieldName": "predicted_rul",
+                  "displayName": "Predicted RUL",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "axis": {
+                    "title": "Predicted RUL"
+                  }
+                },
+                "color": {
+                  "fieldName": "risk_band",
+                  "displayName": "Risk band",
+                  "scale": {
+                    "type": "categorical"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Endpoint: predicted vs actual RUL",
+                "showDescription": true,
+                "description": "Points above the diagonal overestimate life (the unsafe direction)"
+              },
+              "mark": {
+                "colors": [
+                  "#077A9D",
+                  "#FFAB00",
+                  "#00A972",
+                  "#FF3621",
+                  "#8BCAE7",
+                  "#AB4057",
+                  "#99DDB4",
+                  "#FCA4A1",
+                  "#919191",
+                  "#BF7080"
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 11,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "drift_scatter",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "latest_drift",
+                  "disaggregated": true,
+                  "fields": [
+                    {
+                      "name": "raw_psi",
+                      "expression": "`raw_psi`"
+                    },
+                    {
+                      "name": "psi_age_matched",
+                      "expression": "`psi_age_matched`"
+                    },
+                    {
+                      "name": "feature",
+                      "expression": "`feature`"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 3,
+              "widgetType": "scatter",
+              "encodings": {
+                "x": {
+                  "fieldName": "raw_psi",
+                  "displayName": "Raw PSI",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "axis": {
+                    "title": "Raw PSI vs all training rows"
+                  }
+                },
+                "y": {
+                  "fieldName": "psi_age_matched",
+                  "displayName": "Age-matched PSI",
+                  "scale": {
+                    "type": "quantitative"
+                  },
+                  "axis": {
+                    "title": "Age-matched PSI (alert above 0.2)"
+                  }
+                }
+              },
+              "frame": {
+                "showTitle": true,
+                "title": "Feature drift: raw vs age-matched PSI",
+                "showDescription": true,
+                "description": "Raw PSI mostly reflects younger fleet engines; age matching removes that"
+              },
+              "mark": {
+                "colors": [
+                  "#077A9D",
+                  "#FFAB00",
+                  "#00A972",
+                  "#FF3621",
+                  "#8BCAE7",
+                  "#AB4057",
+                  "#99DDB4",
+                  "#FCA4A1",
+                  "#919191",
+                  "#BF7080"
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 17,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "drift_table",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "latest_drift",
+                  "disaggregated": true,
+                  "fields": [
+                    {
+                      "name": "feature",
+                      "expression": "`feature`"
+                    },
+                    {
+                      "name": "psi_age_matched",
+                      "expression": "`psi_age_matched`"
+                    },
+                    {
+                      "name": "raw_psi",
+                      "expression": "`raw_psi`"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "frame": {
+                "showTitle": true,
+                "title": "Drift by feature (latest snapshot)"
+              },
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "feature",
+                    "displayName": "Feature"
+                  },
+                  {
+                    "fieldName": "psi_age_matched",
+                    "displayName": "Age-matched PSI"
+                  },
+                  {
+                    "fieldName": "raw_psi",
+                    "displayName": "Raw PSI"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 17,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "performance_table",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "latest_performance",
+                  "disaggregated": true,
+                  "fields": [
+                    {
+                      "name": "segment",
+                      "expression": "`segment`"
+                    },
+                    {
+                      "name": "rows",
+                      "expression": "`rows`"
+                    },
+                    {
+                      "name": "rmse",
+                      "expression": "`rmse`"
+                    },
+                    {
+                      "name": "mae",
+                      "expression": "`mae`"
+                    },
+                    {
+                      "name": "bias",
+                      "expression": "`bias`"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "frame": {
+                "showTitle": true,
+                "title": "Champion performance by segment (latest snapshot)",
+                "showDescription": true,
+                "description": "endpoint is the official benchmark; rul_126_plus is underestimated by design (labels capped at 125)"
+              },
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "segment",
+                    "displayName": "Segment"
+                  },
+                  {
+                    "fieldName": "rows",
+                    "displayName": "Rows"
+                  },
+                  {
+                    "fieldName": "rmse",
+                    "displayName": "RMSE"
+                  },
+                  {
+                    "fieldName": "mae",
+                    "displayName": "MAE"
+                  },
+                  {
+                    "fieldName": "bias",
+                    "displayName": "Bias (+ = overestimate)"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 23,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "alert_runs_table",
+            "queries": [
+              {
+                "name": "main_query",
+                "query": {
+                  "datasetName": "alert_runs",
+                  "disaggregated": true,
+                  "fields": [
+                    {
+                      "name": "checked_at",
+                      "expression": "`checked_at`"
+                    },
+                    {
+                      "name": "model_version",
+                      "expression": "`model_version`"
+                    },
+                    {
+                      "name": "checks",
+                      "expression": "`checks`"
+                    },
+                    {
+                      "name": "breaches",
+                      "expression": "`breaches`"
+                    },
+                    {
+                      "name": "psi_threshold",
+                      "expression": "`psi_threshold`"
+                    },
+                    {
+                      "name": "rmse_increase_threshold",
+                      "expression": "`rmse_increase_threshold`"
+                    },
+                    {
+                      "name": "alert_job_run",
+                      "expression": "`alert_job_run`"
+                    }
+                  ]
+                }
+              }
+            ],
+            "spec": {
+              "version": 2,
+              "widgetType": "table",
+              "frame": {
+                "showTitle": true,
+                "title": "Alert runs (audit trail)",
+                "showDescription": true,
+                "description": "Runs with a PSI threshold of 0.05 were deliberate breach tests"
+              },
+              "encodings": {
+                "columns": [
+                  {
+                    "fieldName": "checked_at",
+                    "displayName": "Checked at"
+                  },
+                  {
+                    "fieldName": "model_version",
+                    "displayName": "Model version"
+                  },
+                  {
+                    "fieldName": "checks",
+                    "displayName": "Checks"
+                  },
+                  {
+                    "fieldName": "breaches",
+                    "displayName": "Breaches"
+                  },
+                  {
+                    "fieldName": "psi_threshold",
+                    "displayName": "PSI threshold"
+                  },
+                  {
+                    "fieldName": "rmse_increase_threshold",
+                    "displayName": "RMSE increase threshold"
+                  },
+                  {
+                    "fieldName": "alert_job_run",
+                    "displayName": "Job run"
+                  }
+                ]
+              }
+            }
+          },
+          "position": {
+            "x": 3,
+            "y": 23,
+            "width": 3,
+            "height": 6
+          }
+        },
+        {
+          "widget": {
+            "name": "fleet_notes",
+            "multilineTextboxSpec": {
+              "lines": [
+                "**Notes.** Metrics use delayed labels and are operational evidence only: models are chosen and promoted by the validation gate, never by these numbers. The fleet is the benchmark test set, so this is a simulation, not evidence of reduced real-world downtime. Rebuilt by the `analytics_refresh` job."
+              ]
+            }
+          },
+          "position": {
+            "x": 0,
+            "y": 29,
+            "width": 6,
+            "height": 2
+          }
+        }
+      ]
+    }
+  ]
+}

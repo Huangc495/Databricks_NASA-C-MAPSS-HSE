@@ -1,0 +1,354 @@
+{
+  "job": {
+    "name": "analytics_refresh",
+    "job_id": 847239470140874,
+    "run_id": 429694746857912,
+    "result": "SUCCESS",
+    "run_seconds": 450.9,
+    "setup_seconds": 195.0,
+    "execution_seconds": 255.0,
+    "sql_warehouse": false
+  },
+  "report": {
+    "osha_injury_facts": {
+      "rows": 105993,
+      "documents": 105993,
+      "by_era": {
+        "2015-23": 88247,
+        "2024-25": 17746
+      },
+      "not_classifiable": {
+        "event_category": 827,
+        "body_part_category": 3975,
+        "source_category": 3058
+      },
+      "nature_unspecified": 10259
+    },
+    "cmapss_fleet_status": {
+      "rows": 100,
+      "champion_version": 3,
+      "risk_bands": {
+        "healthy": 71,
+        "critical": 15,
+        "warning": 14
+      },
+      "lowest_predicted_rul": [
+        {
+          "unit": 34,
+          "last_cycle": 203,
+          "predicted_rul": 6.635345210981352,
+          "actual_rul": 7
+        },
+        {
+          "unit": 35,
+          "last_cycle": 198,
+          "predicted_rul": 8.399291556463226,
+          "actual_rul": 11
+        },
+        {
+          "unit": 81,
+          "last_cycle": 213,
+          "predicted_rul": 10.17710372981359,
+          "actual_rul": 8
+        },
+        {
+          "unit": 68,
+          "last_cycle": 187,
+          "predicted_rul": 10.414534300221842,
+          "actual_rul": 8
+        },
+        {
+          "unit": 76,
+          "last_cycle": 205,
+          "predicted_rul": 11.637951998293257,
+          "actual_rul": 10
+        }
+      ]
+    },
+    "commented_tables": [
+      "cmapss_alerts",
+      "cmapss_feature_drift",
+      "cmapss_model_performance",
+      "cmapss_predictions"
+    ],
+    "query_checks": {
+      "fleet_health/fleet_kpis": {
+        "rows": 1,
+        "seconds": 1.5
+      },
+      "fleet_health/fleet_status": {
+        "rows": 100,
+        "seconds": 1.0
+      },
+      "fleet_health/at_risk_trajectories": {
+        "rows": 1006,
+        "seconds": 1.9
+      },
+      "fleet_health/latest_performance": {
+        "rows": 8,
+        "seconds": 2.1
+      },
+      "fleet_health/latest_drift": {
+        "rows": 43,
+        "seconds": 1.5
+      },
+      "fleet_health/alert_runs": {
+        "rows": 3,
+        "seconds": 1.1
+      },
+      "safety_incidents/injuries": {
+        "rows": 105993,
+        "seconds": 1.1
+      },
+      "genie/sentinelops_operations/c0000000000000000000000000000001": {
+        "rows": 15,
+        "seconds": 1.0
+      },
+      "genie/sentinelops_operations/c0000000000000000000000000000002": {
+        "rows": 1,
+        "seconds": 1.5
+      },
+      "genie/sentinelops_operations/c0000000000000000000000000000003": {
+        "rows": 10,
+        "seconds": 1.2
+      },
+      "genie/sentinelops_operations/c0000000000000000000000000000004": {
+        "rows": 11,
+        "seconds": 1.3
+      },
+      "genie/sentinelops_operations/c0000000000000000000000000000005": {
+        "rows": 10,
+        "seconds": 1.1
+      }
+    },
+    "seconds": 190.3
+  },
+  "local_rehearsal": {
+    "osha_injury_facts_rows": 105993,
+    "harmonized_truth_changes": {
+      "event": 69,
+      "body_part": 3932,
+      "source": 371
+    },
+    "note": "Built from the minimized landing files before any cloud run; the cloud table matched row count, not-classifiable and unspecified counts exactly."
+  },
+  "warehouse_dataset_check": {
+    "note": "Every dashboard dataset rerun on the SQL warehouse (Statement Execution API); the 106k-row injuries dataset is summarized.",
+    "results": {
+      "alert_runs_audit": {
+        "row_count": 3,
+        "first_rows": [
+          [
+            "599725542930474",
+            "2026-09-24T08:11:36.788Z",
+            "47",
+            "0",
+            "0",
+            "0.2"
+          ],
+          [
+            "245262911606779",
+            "2026-09-24T08:19:44.027Z",
+            "94",
+            "40",
+            "40",
+            "0.05"
+          ],
+          [
+            "955572570273055",
+            "2026-09-24T08:30:49.787Z",
+            "47",
+            "20",
+            "20",
+            "0.05"
+          ]
+        ],
+        "seconds": 1.5
+      },
+      "fleet_health/fleet_kpis": {
+        "row_count": 1,
+        "first_rows": [
+          [
+            "100",
+            "15",
+            "14",
+            "3",
+            "18.341479192292436",
+            "20"
+          ]
+        ],
+        "seconds": 0.9
+      },
+      "fleet_health/fleet_status": {
+        "row_count": 100,
+        "first_rows": [
+          [
+            "34",
+            "203",
+            "6.6",
+            "critical",
+            "1 critical (<= 20)",
+            "7",
+            "3"
+          ],
+          [
+            "35",
+            "198",
+            "8.4",
+            "critical",
+            "1 critical (<= 20)",
+            "11",
+            "3"
+          ],
+          [
+            "81",
+            "213",
+            "10.2",
+            "critical",
+            "1 critical (<= 20)",
+            "8",
+            "3"
+          ]
+        ],
+        "seconds": 2.4
+      },
+      "fleet_health/at_risk_trajectories": {
+        "row_count": 1006,
+        "first_rows": [
+          [
+            "Engine 068",
+            "9",
+            "125.99423231733104"
+          ],
+          [
+            "Engine 068",
+            "10",
+            "125.60466019949325"
+          ],
+          [
+            "Engine 068",
+            "20",
+            "126.22465545114845"
+          ]
+        ],
+        "seconds": 0.9
+      },
+      "fleet_health/latest_performance": {
+        "row_count": 8,
+        "first_rows": [
+          [
+            "endpoint",
+            "100",
+            "18.34",
+            "13.17",
+            "0.19",
+            "3",
+            "2026-09-24T08:11:01.630Z",
+            "1"
+          ],
+          [
+            "actual_le_125",
+            "5144",
+            "19.17",
+            "14.42",
+            "5.12",
+            "3",
+            "2026-09-24T08:11:01.630Z",
+            "2"
+          ],
+          [
+            "all",
+            "13096",
+            "57.2",
+            "42.14",
+            "-34.47",
+            "3",
+            "2026-09-24T08:11:01.630Z",
+            "3"
+          ]
+        ],
+        "seconds": 1.9
+      },
+      "fleet_health/latest_drift": {
+        "row_count": 43,
+        "first_rows": [
+          [
+            "sensor_17_mean_10",
+            "0.441",
+            "0.102",
+            "2026-09-24T08:11:03.929Z"
+          ],
+          [
+            "sensor_9_mean_10",
+            "0.276",
+            "0.099",
+            "2026-09-24T08:11:03.929Z"
+          ],
+          [
+            "sensor_21_mean_10",
+            "0.426",
+            "0.098",
+            "2026-09-24T08:11:03.929Z"
+          ]
+        ],
+        "seconds": 1.4
+      },
+      "fleet_health/alert_runs": {
+        "row_count": 3,
+        "first_rows": [
+          [
+            "955572570273055",
+            "2026-09-24T08:30:49.787Z",
+            "3",
+            "47",
+            "20",
+            "0.05",
+            "0.2"
+          ],
+          [
+            "245262911606779",
+            "2026-09-24T08:19:44.027Z",
+            "3",
+            "94",
+            "40",
+            "0.05",
+            "0.2"
+          ],
+          [
+            "599725542930474",
+            "2026-09-24T08:11:36.788Z",
+            "3",
+            "47",
+            "0",
+            "0.2",
+            "0.2"
+          ]
+        ],
+        "seconds": 0.8
+      },
+      "safety_incidents/injuries": {
+        "row_count": 1,
+        "first_rows": [
+          [
+            "105993",
+            "27960",
+            "35",
+            "2015-01-01",
+            "2025-11-01"
+          ]
+        ],
+        "seconds": 0.9
+      }
+    }
+  },
+  "render_check": {
+    "method": "Published dashboards opened in the in-app browser, signed in by the user, 2026-09-24 16:38-16:46 UTC.",
+    "fleet_health": "All 17 widgets render. KPIs 100 engines / 15 critical / 14 warning / champion v3 / endpoint RMSE 18.34 / 20 breaches in the latest (breach-test) alert run.",
+    "safety_incidents": "All 14 widgets render. 105.99K reports, 27.96K with an amputation, 35 with loss of an eye.",
+    "found_and_fixed": [
+      "Table widgets written with spec version 1 rendered 'Visualization has no fields selected'; spec version 2 (fieldName + displayName per column) renders.",
+      "The yearly injury-type chart had 13 series, but the renderer cycles 10 colors, so three pairs shared a color (supplying 14 colors did not help). It now shows the 9 largest types plus 'Other injury types'.",
+      "Title boxes grew from 2 to 3 rows; at narrow widths the text scrolled."
+    ]
+  }
+}

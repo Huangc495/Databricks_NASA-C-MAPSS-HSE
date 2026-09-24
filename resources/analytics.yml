@@ -1,0 +1,180 @@
+resources:
+  jobs:
+    # Manual only; no SQL warehouse. Rebuilds gold.osha_injury_facts and gold.cmapss_fleet_status,
+    # applies the column comments Genie reads, then runs every dashboard dataset and Genie example
+    # query on serverless job compute. Run after osha_ingest or cmapss_retrain.
+    analytics_refresh:
+      name: sentinelops-analytics-refresh
+      max_concurrent_runs: 1
+      timeout_seconds: 900
+      performance_target: STANDARD
+      tasks:
+        - task_key: refresh
+          max_retries: 0
+          disable_auto_optimization: true
+          timeout_seconds: 900
+          spark_python_task:
+            python_file: ../jobs/refresh_analytics.py
+            parameters:
+              - --catalog
+              - ${var.catalog}
+              - --schema
+              - ${var.schema}
+              - --subset
+              - FD001
+              - --fleet-split
+              - test
+              - --bundle-root
+              - ${workspace.file_path}
+              - --job-run-id
+              - '{{job.run_id}}'
+              - --source-root
+              - ${workspace.file_path}/src
+          environment_key: analytics
+      environments:
+        - environment_key: analytics
+          spec:
+            environment_version: '4'
+            dependencies:
+              - numpy==2.5.3
+              - pandas==2.3.3
+              - mlflow==3.16.1
+              - pyyaml==6.0.3
+
+  # Viewing a dashboard or asking Genie runs queries on the SQL warehouse (billed while it runs,
+  # then 5 minutes idle). Viewers use their own credentials and Unity Catalog permissions.
+  dashboards:
+    fleet_health:
+      display_name: SentinelOps fleet health
+      file_path: ../dashboards/fleet_health.lvdash.json
+      warehouse_id: ${var.warehouse_id}
+      dataset_catalog: ${var.catalog}
+      embed_credentials: false
+    safety_incidents:
+      display_name: SentinelOps safety incidents
+      file_path: ../dashboards/safety_incidents.lvdash.json
+      warehouse_id: ${var.warehouse_id}
+      dataset_catalog: ${var.catalog}
+      embed_credentials: false
+
+  genie_spaces:
+    sentinelops_operations:
+      title: SentinelOps operations
+      description: >-
+        Ask about the simulated turbofan fleet (remaining useful life, model accuracy, drift, alerts) and
+        OSHA Severe Injury Reports (injury types, causes, industries, trends). OSHA data: U.S. Department of
+        Labor; no endorsement implied. Answers never identify workers or employers.
+      warehouse_id: ${var.warehouse_id}
+      # Rules for this body: IDs are 32 lowercase hex characters; tables are sorted by identifier,
+      # column configs by column_name, and every other list by id; at most one text instruction.
+      # tests/test_analytics.py checks them, and the analytics_refresh job runs every example query.
+      serialized_space:
+        version: 2
+        config:
+          sample_questions:
+            - id: a0000000000000000000000000000001
+              question: ["Which engines are predicted to fail within the next 20 cycles?"]
+            - id: a0000000000000000000000000000002
+              question: ["How accurate is the champion model at the benchmark endpoint?"]
+            - id: a0000000000000000000000000000003
+              question: ["Which features drift most after age matching?"]
+            - id: a0000000000000000000000000000004
+              question: ["How many reports involved an amputation each year?"]
+            - id: a0000000000000000000000000000005
+              question: ["What are the most common injury sources in food manufacturing?"]
+        data_sources:
+          tables:
+            - identifier: ${var.catalog}.gold.cmapss_alerts
+            - identifier: ${var.catalog}.gold.cmapss_feature_drift
+            - identifier: ${var.catalog}.gold.cmapss_fleet_status
+              column_configs:
+                - column_name: predicted_rul
+                  synonyms: ["remaining useful life", "RUL", "cycles to failure", "life left"]
+                - column_name: unit
+                  synonyms: ["engine", "engine number", "asset"]
+            - identifier: ${var.catalog}.gold.cmapss_model_performance
+            - identifier: ${var.catalog}.gold.cmapss_predictions
+            - identifier: ${var.catalog}.gold.osha_injury_facts
+              column_configs:
+                - column_name: body_part_category
+                  synonyms: ["body part", "part of body"]
+                - column_name: event_category
+                  synonyms: ["event", "how it happened", "incident type"]
+                - column_name: industry_sector
+                  synonyms: ["industry", "sector"]
+                - column_name: nature_category
+                  synonyms: ["injury type", "nature of injury", "injury"]
+                - column_name: source_category
+                  synonyms: ["source", "cause", "object involved"]
+        instructions:
+          text_instructions:
+            - id: b0000000000000000000000000000001
+              content:
+                - "SentinelOps covers two separate domains. Use only the attached tables.\n"
+                - "\n"
+                - "Turbofan fleet (simulated, NASA C-MAPSS FD001). NASA's 100 test engines play the in-service fleet. RUL is remaining useful life in operating cycles.\n"
+                - "- For the current outlook per engine use cmapss_fleet_status (one row per engine). 'Will fail within N cycles' means predicted_rul <= N. Risk bands: critical <= 20, warning <= 50, healthy > 50; they are illustrative planning thresholds.\n"
+                - "- The model was trained on RUL labels capped at 125, so predictions for healthy engines top out near 125. Mention this when discussing long-lived engines.\n"
+                - "- cmapss_predictions holds every scored cycle; filter it to the model_version found in cmapss_fleet_status.\n"
+                - "- cmapss_model_performance and cmapss_feature_drift are append-only snapshots. Use the latest computed_at (for performance, of the champion's model_version). The endpoint segment is the official benchmark. These are operational metrics; never use them to choose or promote models.\n"
+                - "- Judge drift by psi_age_matched; raw psi mostly reflects that fleet engines are younger than training engines. 0.2 is the alert threshold.\n"
+                - "- cmapss_alerts is an audit trail. Some runs were deliberate breach tests with a lowered threshold, so always report the threshold next to a breach.\n"
+                - "\n"
+                - "OSHA Severe Injury Reports (osha_injury_facts): federal OSHA, January 2015 to November 2025, one row per report (incident). Source: U.S. Department of Labor, OSHA.\n"
+                - "- Count reports with COUNT(*). hospitalized, amputation and loss_of_eye count employees within a report; 'reports involving an amputation' means amputation > 0.\n"
+                - "- Use the *_category columns for injury types, causes and body parts. They are harmonized across OSHA's 2024 coding change.\n"
+                - "- For an industry, filter naics by prefix (for example naics LIKE '311%' for food manufacturing) or use industry_sector.\n"
+                - "- 2025 covers only January to November; say so when comparing years. The data covers severe injuries reported to federal OSHA, not all injuries.\n"
+                - "- The data has no narratives, employer names or addresses. Decline requests to identify employers, workers or worksites."
+          example_question_sqls:
+            - id: c0000000000000000000000000000001
+              question: ["Which engines are predicted to fail within the next 20 cycles?"]
+              sql:
+                - "SELECT unit, last_cycle, round(predicted_rul, 1) AS predicted_rul, risk_band\n"
+                - "FROM ${var.catalog}.gold.cmapss_fleet_status\n"
+                - "WHERE predicted_rul <= 20\n"
+                - "ORDER BY predicted_rul"
+            - id: c0000000000000000000000000000002
+              question: ["What is the champion's latest accuracy at the benchmark endpoint?"]
+              sql:
+                - "SELECT model_version, rows, round(rmse, 2) AS rmse, round(mae, 2) AS mae, round(bias, 2) AS bias, computed_at\n"
+                - "FROM ${var.catalog}.gold.cmapss_model_performance\n"
+                - "WHERE segment = 'endpoint'\n"
+                - "  AND model_version = (SELECT max(model_version) FROM ${var.catalog}.gold.cmapss_fleet_status)\n"
+                - "ORDER BY computed_at DESC\n"
+                - "LIMIT 1"
+            - id: c0000000000000000000000000000003
+              question: ["Which features drift most after age matching?"]
+              sql:
+                - "SELECT feature, round(psi_age_matched, 3) AS psi_age_matched, round(psi, 3) AS raw_psi\n"
+                - "FROM ${var.catalog}.gold.cmapss_feature_drift\n"
+                - "WHERE computed_at = (SELECT max(computed_at) FROM ${var.catalog}.gold.cmapss_feature_drift)\n"
+                - "ORDER BY psi_age_matched DESC\n"
+                - "LIMIT 10"
+            - id: c0000000000000000000000000000004
+              question: ["How many reports involved an amputation each year?"]
+              sql:
+                - "SELECT event_year, count(*) AS reports\n"
+                - "FROM ${var.catalog}.gold.osha_injury_facts\n"
+                - "WHERE amputation > 0\n"
+                - "GROUP BY event_year\n"
+                - "ORDER BY event_year"
+            - id: c0000000000000000000000000000005
+              question: ["What are the most common injury sources in food manufacturing?"]
+              sql:
+                - "SELECT source_category, count(*) AS reports\n"
+                - "FROM ${var.catalog}.gold.osha_injury_facts\n"
+                - "WHERE naics LIKE '311%'\n"
+                - "GROUP BY source_category\n"
+                - "ORDER BY reports DESC"
+            # Added after the held-out check: Genie listed 43 alert rows and miscounted the breaches
+            # in its summary (21, truly 20). Count in SQL, not in prose.
+            - id: c0000000000000000000000000000006
+              question: ["Summarize the latest alerts run: checks, breaches and thresholds."]
+              sql:
+                - "SELECT alert_job_run, min(checked_at) AS checked_at, `check`, count(*) AS checks,\n"
+                - "  count_if(breached) AS breaches, max(threshold) AS threshold\n"
+                - "FROM ${var.catalog}.gold.cmapss_alerts\n"
+                - "WHERE alert_job_run = (SELECT max_by(alert_job_run, checked_at) FROM ${var.catalog}.gold.cmapss_alerts)\n"
+                - "GROUP BY alert_job_run, `check`\n"
+                - "ORDER BY `check`"
