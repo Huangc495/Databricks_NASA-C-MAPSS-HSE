@@ -13,7 +13,7 @@ Last verified: September 24, 2026, 16:58 UTC (AI/BI dashboards, Genie and budget
 - **Cost:** September 24 has CAD 8.05 posted so far and is projected at about
   CAD 10.6; see "Cost and runtime controls". Start the next billable task on
   September 25 (UTC) or later.
-- **Git:** the dashboards/Genie milestone isn't committed yet.
+- **Git:** every milestone is committed on `main` (dashboards/Genie: `b94c34a`); there is no remote.
 
 ## Task status
 
@@ -79,7 +79,7 @@ cost or prerequisites, with the reason given.
 | Task | Status | Evidence or next action |
 |---|---|---|
 | Unit tests (82) and local CI workflow file | Done (local) | `.github/workflows/ci.yml` has never run: no remote |
-| Git history | Done (local) | Branch `main`; no remote. The dashboards/Genie milestone is not committed yet |
+| Git history | Done (local) | Branch `main`; no remote. Latest milestone commit `b94c34a` |
 | GitHub repository, CI runs, OIDC deployment to staging/prod | Not started | Needs your choice of repository and visibility |
 | AI/BI dashboards and Genie space | Done | Fleet health and Safety incidents dashboards, Genie space over 6 curated Gold tables, `analytics_refresh` job; Genie 7/8 held-out questions fully right (one miscounted summary); [ANALYTICS.md](ANALYTICS.md) |
 | SQL warehouse right-sizing | Done | Starter warehouse Small → 2X-Small, auto-stop 10 → 5 min (your approval); a wake-up now costs ~CAD 0.35, not ~2.3 |

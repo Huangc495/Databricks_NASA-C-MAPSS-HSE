@@ -1,8 +1,8 @@
 # SentinelOps — handover for the next session
 
 Last updated: September 24, 2026, 17:00 UTC. Git `main` holds every milestone
-up to orchestrated retraining; the dashboards/Genie milestone is uncommitted
-until the user asks (no remote); see section 6.
+so far, including dashboards/Genie (commit `b94c34a`); there is no remote. See
+section 6.
 
 **Where things stand.** Both halves of the portfolio project run in Azure
 Databricks, and every job is manual, bounded and verified.
@@ -332,8 +332,7 @@ development mode off.
   databricks-sdk 0.140.0. Keep local and cloud versions consistent.
 - Git: branch `main`, author Cheng Huang <cheng.huang.ca@outlook.com>
   (repo-local config), no remote. The latest milestone commit is
-  `5361947` (orchestrated retraining), followed by the handover rewrite
-  `d117085`. The dashboards/Genie milestone is uncommitted until the user asks.
+  `b94c34a` (AI/BI dashboards, Genie and the budget alert).
   The CI workflow in `.github/workflows/ci.yml` has never run.
 
 ## 7. Working agreement that has served well
