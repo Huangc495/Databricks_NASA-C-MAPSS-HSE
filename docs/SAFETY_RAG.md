@@ -127,13 +127,68 @@ What was measured before and during the build:
   minutes of serverless (including the cancelled run and two one-minute
   diagnostics).
 
+## Retrieval evaluation (`osha_retrieval_eval`)
+
+**Question:** does exact dense search find the right incidents, how does it
+compare with keywords, and can it use 256 dimensions instead of 1,024?
+
+**Method.** `sentinelops.retrieval_eval` defines 28 paraphrased questions,
+written after profiling OSHA's code vocabulary, plus 4 off-topic questions.
+A report counts as relevant when its OSHA codes satisfy the question's rule:
+every clause must match, and a clause matches when any of its columns does.
+Each question has 174–4,000 relevant reports, with base rates of
+0.16%–3.7%. Questions are embedded with the query instruction via `ai_query`.
+The job runs exact top-10 search over all 105,993 documents (1,024 dimensions,
+and 256 via Matryoshka truncation) and compares it with a TF-IDF baseline on
+the same documents. Results are logged to MLflow (experiment
+`sentinelops-safety-rag`). The code path was rehearsed locally first:
+TF-IDF on the real corpus, and the reporting path with random vectors.
+
+**Results** (eval v2, run `603274434690806`, MLflow `5ee4a80e430c431e932504222d041bbe`):
+
+| Method | Precision@10 | MRR | nDCG@10 | Top-1 correct | Memory | Latency per query |
+|---|---|---|---|---|---|---|
+| Dense, 1,024 dimensions | 0.882 | 0.908 | 0.881 | 0.857 | 414 MB | 2.8 ms |
+| Dense, 256 dimensions | 0.882 | 0.920 | 0.877 | 0.857 | 104 MB | 2.7 ms |
+| TF-IDF | 0.786 | 0.859 | 0.786 | 0.786 | sparse | 1.3 ms |
+
+- **Dense beats keywords** by +0.096 precision@10, paired-bootstrap 95% CI
+  [0.011, 0.196] (11 better, 14 tied, 3 worse). The gains come on
+  paraphrased questions such as skylight falls (1.0 vs 0.1), back injuries
+  from lifting (1.0 vs 0.3) and scaffold falls (1.0 vs 0.6).
+- **256 vs 1,024: no detectable difference.** Mean 0.000, CI [−0.036, 0.043];
+  17 of 28 tied, and 1,024 was narrowly ahead on 8. Their top-10 lists overlap
+  only 50%, yet they're equally relevant. **Decision: use 256 dimensions for
+  the assistant** (a quarter of the memory). The 1,024 values stay stored, so
+  a larger evaluation can revisit this.
+- **Off-topic separation** (4 questions): the lowest on-topic top-1 score is
+  0.665 at 1,024 and 0.711 at 256; the highest off-topic score is 0.431 and
+  0.512. The groups separate, but these negatives are easy (recipes,
+  passwords). The abstention threshold must be calibrated in the next step with
+  in-domain questions the reports can't answer (for example, OSHA penalty
+  amounts).
+- **The v1 → v2 change was to the answer key, not the system.** Inspecting v1's
+  weakest question found OSHA also codes table saws as `Stationary saws  table`,
+  which the rule missed; 82 amputations were uncounted. Only that rule changed,
+  and it applies to every method. The v1 run (`133374292493436`) is kept in
+  MLflow.
+- **Remaining weak spots are label limits, not hidden:**
+  - `truck_dock_pinned` (0.1–0.2): results are trucks pinning workers at docks,
+    but OSHA codes the truck, not the dock, as the source.
+  - `toe_amputation` (0.3–0.6): results include toe crush injuries that aren't
+    amputations; this one is a genuine retrieval weakness.
+  - Every document's header repeats its code titles, so absolute scores are
+    optimistic. The comparisons are the point.
+
+Evidence: [osha-retrieval-eval.json](osha-retrieval-eval.json).
+
 ## Next steps
 
-1. Retrieval module and a small labelled retrieval evaluation set built from
-   OSHA's own classification codes (for example, "amputation incidents
-   involving presses"), comparing 1,024 and 256 dimensions.
-2. Grounded answers from GPT-OSS-120B with inline `[report_id]` citations, an
-   abstention rule, and MLflow tracing.
+1. Done: exact retrieval and its evaluation (above).
+2. Grounded answers from GPT-OSS-120B with inline `[report_id]` citations,
+   retrieval at 256 dimensions, an abstention rule, and MLflow tracing. The
+   abstention threshold must be calibrated on in-domain questions the reports
+   can't answer, not only on off-topic ones.
 3. Evaluation: correctness, groundedness and relevance using an LLM judge from
    a different model family (Llama 3.3 70B), plus citation validity checks.
 4. Structured extraction of event, nature, body part and source from

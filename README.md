@@ -93,8 +93,10 @@ this timeout reduces exposure but is not a hard billing cap.
 2. Extend training beyond FD001 using the existing composite keys.
 3. Safety assistant over OSHA Severe Injury Reports. Done: provenance, a
    privacy-minimized landing, the `osha_safety` pipeline to Gold (105,993
-   documents), and Qwen3 embeddings for all of them via `ai_query`. Next: exact
-   retrieval, cited answers and evaluation.
+   documents), Qwen3 embeddings for all of them via `ai_query`, and exact
+   retrieval evaluated on OSHA-code relevance: dense precision@10 0.88 vs 0.79
+   for TF-IDF, with 256 dimensions matching 1,024. Next: cited answers and
+   their evaluation.
    See [docs/SAFETY_RAG.md](docs/SAFETY_RAG.md). Data courtesy of the U.S.
    Department of Labor (OSHA); no endorsement implied.
 4. Add Event Hubs/API sources, dashboard/Genie and OIDC staging/production CI/CD.

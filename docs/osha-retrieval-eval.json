@@ -1,0 +1,250 @@
+{
+  "job_id": 383639217735446,
+  "run_id": 603274434690806,
+  "result": "SUCCESS",
+  "mlflow_run_id": "5ee4a80e430c431e932504222d041bbe",
+  "documents": 105993,
+  "eval_fingerprint": "05ca195492ea",
+  "summary": {
+    "dense_1024": {
+      "p_at_5": 0.8857,
+      "p_at_10": 0.8821,
+      "mrr": 0.9077,
+      "ndcg_at_10": 0.8808,
+      "hit_at_1": 0.8571,
+      "lift_at_10": 158.835,
+      "top1_score": 0.723
+    },
+    "dense_256": {
+      "p_at_5": 0.8786,
+      "p_at_10": 0.8821,
+      "mrr": 0.9196,
+      "ndcg_at_10": 0.8772,
+      "hit_at_1": 0.8571,
+      "lift_at_10": 160.3648,
+      "top1_score": 0.7645
+    },
+    "tfidf": {
+      "p_at_5": 0.7786,
+      "p_at_10": 0.7857,
+      "mrr": 0.8593,
+      "ndcg_at_10": 0.7855,
+      "hit_at_1": 0.7857,
+      "lift_at_10": 137.8756,
+      "top1_score": 0.4634
+    }
+  },
+  "latency_ms_per_query": {
+    "dense_1024": 3.92,
+    "dense_256": 2.7,
+    "tfidf": 1.44
+  },
+  "index_mb": {
+    "dense_1024": 414.0,
+    "dense_256": 103.5
+  },
+  "top10_overlap_1024_vs_256": 0.5036,
+  "off_topic_top1": {
+    "dense_1024": {
+      "off_capital": 0.4236,
+      "off_password": 0.4295,
+      "off_revenue": 0.3588,
+      "off_recipe": 0.4305
+    },
+    "dense_256": {
+      "off_capital": 0.5123,
+      "off_password": 0.4998,
+      "off_revenue": 0.4695,
+      "off_recipe": 0.5058
+    }
+  },
+  "separation": {
+    "dense_1024": {
+      "min_on_topic_top1": 0.6652,
+      "max_off_topic_top1": 0.4305,
+      "separated": true
+    },
+    "dense_256": {
+      "min_on_topic_top1": 0.7112,
+      "max_off_topic_top1": 0.5123,
+      "separated": true
+    }
+  },
+  "per_question_p_at_10": {
+    "arc_flash": {
+      "dense_1024": 1.0,
+      "dense_256": 0.9,
+      "tfidf": 1.0
+    },
+    "backing_vehicle": {
+      "dense_1024": 1.0,
+      "dense_256": 1.0,
+      "tfidf": 1.0
+    },
+    "chemical_burn": {
+      "dense_1024": 1.0,
+      "dense_256": 1.0,
+      "tfidf": 1.0
+    },
+    "conveyor_caught": {
+      "dense_1024": 0.8,
+      "dense_256": 0.7,
+      "tfidf": 0.8
+    },
+    "crane_load": {
+      "dense_1024": 0.9,
+      "dense_256": 0.8,
+      "tfidf": 0.8
+    },
+    "dog_bite": {
+      "dense_1024": 1.0,
+      "dense_256": 1.0,
+      "tfidf": 1.0
+    },
+    "drill_entangled": {
+      "dense_1024": 1.0,
+      "dense_256": 1.0,
+      "tfidf": 1.0
+    },
+    "explosion": {
+      "dense_1024": 1.0,
+      "dense_256": 0.9,
+      "tfidf": 1.0
+    },
+    "eye_flying_fragment": {
+      "dense_1024": 1.0,
+      "dense_256": 1.0,
+      "tfidf": 0.7
+    },
+    "forklift_foot": {
+      "dense_1024": 0.9,
+      "dense_256": 0.9,
+      "tfidf": 1.0
+    },
+    "fryer_burn": {
+      "dense_1024": 0.8,
+      "dense_256": 0.7,
+      "tfidf": 0.7
+    },
+    "heat_stroke": {
+      "dense_1024": 1.0,
+      "dense_256": 1.0,
+      "tfidf": 1.0
+    },
+    "lawn_mower": {
+      "dense_1024": 1.0,
+      "dense_256": 1.0,
+      "tfidf": 1.0
+    },
+    "lifting_back": {
+      "dense_1024": 1.0,
+      "dense_256": 0.9,
+      "tfidf": 0.3
+    },
+    "meat_grinder": {
+      "dense_1024": 1.0,
+      "dense_256": 1.0,
+      "tfidf": 1.0
+    },
+    "nail_gun": {
+      "dense_1024": 1.0,
+      "dense_256": 0.9,
+      "tfidf": 0.9
+    },
+    "power_line": {
+      "dense_1024": 0.9,
+      "dense_256": 0.9,
+      "tfidf": 0.6
+    },
+    "press_fingertip": {
+      "dense_1024": 0.9,
+      "dense_256": 0.8,
+      "tfidf": 0.9
+    },
+    "scaffold_fall": {
+      "dense_1024": 1.0,
+      "dense_256": 1.0,
+      "tfidf": 0.6
+    },
+    "skylight_fall": {
+      "dense_1024": 1.0,
+      "dense_256": 1.0,
+      "tfidf": 0.1
+    },
+    "slip_ankle_fracture": {
+      "dense_1024": 1.0,
+      "dense_256": 1.0,
+      "tfidf": 0.7
+    },
+    "stepladder_fracture": {
+      "dense_1024": 0.9,
+      "dense_256": 0.9,
+      "tfidf": 0.8
+    },
+    "table_saw_amputation": {
+      "dense_1024": 0.4,
+      "dense_256": 0.8,
+      "tfidf": 0.8
+    },
+    "toe_amputation": {
+      "dense_1024": 0.3,
+      "dense_256": 0.6,
+      "tfidf": 0.2
+    },
+    "toxic_inhalation": {
+      "dense_1024": 1.0,
+      "dense_256": 1.0,
+      "tfidf": 1.0
+    },
+    "tree_struck": {
+      "dense_1024": 0.8,
+      "dense_256": 0.8,
+      "tfidf": 1.0
+    },
+    "trench_cave_in": {
+      "dense_1024": 1.0,
+      "dense_256": 1.0,
+      "tfidf": 1.0
+    },
+    "truck_dock_pinned": {
+      "dense_1024": 0.1,
+      "dense_256": 0.2,
+      "tfidf": 0.1
+    }
+  },
+  "paired_bootstrap_p_at_10": {
+    "questions": 28,
+    "resamples": 20000,
+    "seed": 42,
+    "dense_1024_minus_tfidf": {
+      "mean": 0.0964,
+      "ci95": [
+        0.0107,
+        0.1964
+      ],
+      "wins": 11,
+      "ties": 14,
+      "losses": 3
+    },
+    "dense_256_minus_tfidf": {
+      "mean": 0.0964,
+      "ci95": [
+        0.0143,
+        0.1929
+      ],
+      "wins": 9,
+      "ties": 13,
+      "losses": 6
+    },
+    "dense_256_minus_dense_1024": {
+      "mean": -0.0,
+      "ci95": [
+        -0.0357,
+        0.0429
+      ],
+      "wins": 3,
+      "ties": 17,
+      "losses": 8
+    }
+  }
+}

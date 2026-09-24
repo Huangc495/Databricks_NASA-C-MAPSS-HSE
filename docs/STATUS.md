@@ -2,7 +2,108 @@
 
 Last verified: September 24, 2026.
 
-## Current milestone: Safety GenAI embeddings (OSHA)
+## Task status
+
+This is the single tracker for the full scope in [SentinelOps.md](../SentinelOps.md).
+**Done** means verified in Azure (or locally, where noted) with evidence in
+this file. **Next** marks the agreed order. **Deferred** means held back for
+cost or prerequisites, with the reason given.
+
+### Platform and governance
+
+| Task | Status | Evidence or next action |
+|---|---|---|
+| Azure foundation: ADLS Gen2, workspace, access connector, UC catalog | Done | `infra/main.bicep`; "Azure" section below |
+| Bundle deployment (dev target, strict validation, manual jobs) | Done | `databricks.yml`, `resources/*.yml`; 11 jobs and pipelines deployed |
+| Cost visibility: meter-level Azure cost query | Done | Found an always-on NAT gateway/IP, ~CAD 1.7/day ("Cost and runtime controls") |
+| Azure budget alert | Not started | Cheap safeguard for the $10/day limit; needs your approval to create |
+| Databricks billing tables (`system.billing`) access | Not started | Needs an account/metastore admin grant |
+| dev/staging/prod catalogs, service principals, `run_as` | Not started | After the demo features are complete |
+| Secrets in Key Vault or a secret scope | Not started | Needed once API keys or Event Hubs credentials exist |
+| Private Link / VNet hardening | Deferred | Cost and complexity; public endpoints use authenticated access only |
+
+### Data engineering
+
+| Task | Status | Evidence or next action |
+|---|---|---|
+| C-MAPSS FD001 Auto Loader + Lakeflow medallion with quarantine/conflicts | Done | Pipeline `77ecd502…`; parity verified |
+| Incremental ingestion probe and no-input rerun | Done | `medallion-probe-*.json`, `medallion-rerun-update.json` |
+| FD002–FD004 (multiple operating conditions) | Not started | Keys and `--subset` already support it; needs condition-aware features |
+| REST API ingestion (e.g. weather/energy JSON) | Not started | |
+| Event Hubs (Kafka endpoint) streaming | Not started | Bills while the namespace exists: demo only, then delete |
+
+### Predictive-maintenance ML
+
+| Task | Status | Evidence or next action |
+|---|---|---|
+| Training from Gold with dataset lineage | Done | Version 3; `medallion-training.json` |
+| Validation-gated promotion (never reads test labels) | Done | v3 is `@champion`; `promotion-decision.json` |
+| Fleet batch scoring into an idempotent inference log | Done | `gold.cmapss_predictions`; `fleet-scoring-*.json` |
+| Delayed-label performance and age-matched drift monitoring | Done | `gold.cmapss_model_performance`, `gold.cmapss_feature_drift` |
+| Alerts on drift and performance tables | Not started | Needs thresholds, and a SQL warehouse only while an alert evaluates |
+| Orchestrated retraining (ingest → verify → train → promote → score) | Not started | Also prevents concurrent Gold reads |
+| Real-time serving demo with Gold-format features | Not started | Bounded demo; delete the endpoint afterwards |
+| Hyperparameter tuning, `mlflow.evaluate`, sequence baseline | Not started | |
+| Lakehouse Monitoring inference profile | Not started (optional) | Job-computed metrics already cover the demo |
+
+### Safety GenAI assistant (OSHA)
+
+| Task | Status | Evidence or next action |
+|---|---|---|
+| Source, license and provenance (checksum-pinned) | Done | [SAFETY_RAG.md](SAFETY_RAG.md) |
+| Privacy minimization before upload | Done | 282 narratives masked; identifying columns dropped |
+| OSHA medallion pipeline to Gold `osha_documents` | Done | 105,993 documents, 3 quarantined |
+| Retrieval cost decision (no Vector Search endpoint) | Done | Chosen by you; endpoint would be ~CAD 9.3/day |
+| Document embeddings (`osha_embed`) | Done | 105,993 vectors; `osha-embedding-backfill.json` |
+| Exact retrieval + code-based retrieval evaluation (1,024 vs 256 dimensions) | Done | Dense P@10 0.882 vs TF-IDF 0.786; 256 dims = 1,024 quality at 1/4 memory; `osha-retrieval-eval.json` |
+| Grounded answers with `[report_id]` citations, abstention, MLflow tracing | **Next** | GPT-OSS-120B (pay-per-token), 256-dim retrieval; calibrate abstention on in-domain unanswerable questions |
+| LLM-judge evaluation (correctness, groundedness, relevance) | Not started | Judge from a different model family (Llama 3.3 70B) |
+| Structured extraction scored against OSHA codes | Not started | |
+| Agent deployment / review app | Deferred | Check serving cost first; scale-to-zero only |
+
+### Analytics and delivery
+
+| Task | Status | Evidence or next action |
+|---|---|---|
+| Unit tests (36) and local CI workflow file | Done (local) | `.github/workflows/ci.yml` has never run: no remote |
+| Git history | Done (local) | Branch `main`; no remote |
+| GitHub repository, CI runs, OIDC deployment to staging/prod | Not started | Needs your choice of repository and visibility |
+| AI/BI dashboard and Genie space | Not started | Viewing uses SQL warehouse time |
+| Demo script and portfolio write-up | Not started | Last |
+
+Recommended order: grounded answers and evaluation →
+structured extraction → orchestrated retraining and alerts → dashboard/Genie →
+serving demo → API/streaming sources → environments and CI/CD.
+
+## Current milestone: Safety GenAI retrieval evaluation (OSHA)
+
+Exact dense search is validated against OSHA-code relevance and beats a
+keyword baseline. 256 dimensions are chosen for the assistant. Details:
+[SAFETY_RAG.md](SAFETY_RAG.md#retrieval-evaluation-osha_retrieval_eval).
+
+- **Job `osha_retrieval_eval`** (`383639217735446`), eval v2, run
+  `603274434690806` **SUCCESS**, MLflow run `5ee4a80e430c431e932504222d041bbe`
+  (experiment `sentinelops-safety-rag`). The questions are 28 paraphrases whose
+  relevance comes from OSHA code rules, plus 4 off-topic ones, searched
+  exactly over all 105,993 documents.
+- **Precision@10:** dense-1,024 **0.882**, dense-256 **0.882**, TF-IDF 0.786.
+  Dense minus TF-IDF is +0.096, 95% CI [0.011, 0.196]. 256 minus 1,024 is
+  0.000, CI [−0.036, 0.043]. The 256-dimension index uses 104 MB instead of
+  414 MB, at ~2.7 ms per query.
+- **Off-topic separation** holds at both sizes (lowest on-topic top-1 0.665
+  and 0.711; highest off-topic 0.431 and 0.512). The negatives are easy, so
+  abstention still needs calibration.
+- **Honest caveats:** v1 → v2 fixed one answer-key vocabulary bug (OSHA's
+  reversed title `Stationary saws  table`); v1 run `133374292493436` is kept.
+  Two weak questions reflect code-label limits (`truck_dock_pinned`) or a
+  genuine retrieval weakness (`toe_amputation`). Headers repeat the code
+  titles, so absolute scores are optimistic.
+- The code path was rehearsed locally before cloud runs: TF-IDF on the real
+  corpus (cloud results matched it exactly), and the reporting path with
+  random vectors. 36 local tests pass (7 new).
+- Cost: two ~6-minute serverless runs; question embeddings were negligible.
+
+## Earlier milestone: Safety GenAI embeddings (OSHA)
 
 All 105,993 Gold OSHA documents now have embeddings for exact retrieval. No
 answers are generated yet. Details: [SAFETY_RAG.md](SAFETY_RAG.md#embedding-job-osha_embed).
@@ -265,23 +366,8 @@ completion of the full SentinelOps platform.
 
 ## Scope still pending
 
-1. Finish operational ML:
-   - a bounded real-time serving demo on Gold-format features (endpoint deleted
-     afterwards);
-   - an orchestrated retraining job (ingest → verify → train → promote), which
-     also avoids concurrent Gold reads;
-   - alert thresholds on the age-matched drift and labelled-performance tables;
-   - optionally, a Lakehouse Monitoring inference profile on `gold.cmapss_predictions`.
-
-   Additional external locations are deferred until needed.
-2. Extend beyond FD001 (FD002–FD004 need operating-condition handling); the
-   `(dataset, subset, split, unit, cycle)` keys and `--subset` parameter support it.
-3. Continue the OSHA safety assistant; data, privacy and cost design are done.
-   Embeddings are done (105,993). Next: exact retrieval with an evaluation set
-   built from OSHA codes (1,024 vs 256 dimensions); then grounded answers with
-   citations, abstention and tracing, an LLM-judge evaluation, and structured
-   extraction.
-4. Add Event Hubs/API ingestion, dashboard/Genie, staging/production and OIDC CI/CD.
+See **Task status** at the top of this file. It is the single tracker; this
+section is kept only so older links still resolve.
 
 ## Cost and runtime controls
 

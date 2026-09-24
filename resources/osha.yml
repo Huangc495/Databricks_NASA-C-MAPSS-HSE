@@ -62,3 +62,37 @@ resources:
             environment_version: '4'
             dependencies:
               - numpy==2.5.3
+    # Manual only. Scores exact retrieval (1,024 vs 256 dims) against TF-IDF on
+    # OSHA-code relevance rules and logs results to MLflow.
+    osha_retrieval_eval:
+      name: sentinelops-osha-retrieval-eval
+      max_concurrent_runs: 1
+      timeout_seconds: 1200
+      performance_target: STANDARD
+      tasks:
+        - task_key: evaluate
+          max_retries: 0
+          timeout_seconds: 1200
+          spark_python_task:
+            python_file: ../jobs/evaluate_retrieval.py
+            parameters:
+              - --catalog
+              - ${var.catalog}
+              - --endpoint
+              - databricks-qwen3-embedding-0-6b
+              - --k
+              - '10'
+              - --job-run-id
+              - '{{job.run_id}}'
+              - --source-root
+              - ${workspace.file_path}/src
+          environment_key: evaluate
+      environments:
+        - environment_key: evaluate
+          spec:
+            environment_version: '4'
+            dependencies:
+              - numpy==2.5.3
+              - pandas==2.3.3
+              - scikit-learn==1.9.1
+              - mlflow==3.16.1

@@ -1,8 +1,22 @@
 # SentinelOps — instructions for the next session
 
-Last updated: September 24, 2026 (Safety GenAI embeddings).
+Last updated: September 24, 2026 (Safety GenAI retrieval evaluation).
 
-## Latest continuation — Safety GenAI embeddings
+## Latest continuation — Safety GenAI retrieval evaluation
+
+- `sentinelops.retrieval` provides `ExactIndex` (exact cosine top-k),
+  `truncate` (Matryoshka 1,024 → 256) and a TF-IDF `KeywordIndex` baseline.
+  `sentinelops.retrieval_eval` holds the versioned, code-grounded question
+  set (v2) and its metrics.
+- Job `osha_retrieval_eval` `383639217735446` logs to the MLflow experiment
+  `sentinelops-safety-rag`. v2 result: dense P@10 0.882 at both 1,024 and 256
+  dimensions, TF-IDF 0.786. **Use 256 dimensions** for the assistant.
+- Abstention separation holds only on easy off-topic questions. Calibrate
+  with in-domain questions the reports can't answer before trusting a
+  threshold.
+- Next: grounded answers (STATUS task table).
+
+## Earlier continuation — Safety GenAI embeddings
 
 - Job `osha_embed` `379147303783128` (manual) uses `ai_query` to embed new or
   changed `gold.osha_documents` into `gold.osha_embeddings`, with the Qwen3
@@ -138,7 +152,7 @@ the normal approval mechanism; do not bypass controls or expose tokens.
 | MLflow run ID | `d4cb1f49d8444811999bbaa4dcccbfc0` |
 | Registered model | `sentinelops_dev.sentinelops_dev.turbofan_rul` |
 | Bootstrap model version | **2**, **READY**, no alias (was challenger) |
-| OSHA pipeline / jobs | `osha_safety` `7d53a0fb-d724-4628-a854-23dc1d0e283a` / `osha_ingest` `1070808576153729`, `osha_embed` `379147303783128` |
+| OSHA pipeline / jobs | `osha_safety` `7d53a0fb-d724-4628-a854-23dc1d0e283a` / `osha_ingest` `1070808576153729`, `osha_embed` `379147303783128`, `osha_retrieval_eval` `383639217735446` |
 | Gold-trained version / alias | **3**, **READY**, **champion** (trained by `cmapss_train` run `174998841420766`; promoted by `cmapss_promote` run `268300947742291`) |
 
 The external location points to
@@ -246,28 +260,24 @@ zero application retries, 900-second timeout, and no recurring schedule.
 
 ## Next work, in order
 
-1. **Production-shaped ingestion and medallion path:** done for FD001 (probe,
-   no-input rerun, Gold-fed training all verified). Use
-   `dataset/subset + unit + cycle` keys when extending beyond FD001. Keep train
-   and test trajectories separate; test RUL must come from official endpoint
-   labels, not the maximum observed test cycle.
-2. **Operational ML:** implement scoring of new observations, serving with a
-   defined feature/history contract, inference logging, monitoring with delayed
-   ground truth, and validation-based champion/challenger promotion/retraining.
-   Batch scoring, delayed-label monitoring and the promotion gate are done
-   (docs/OPERATIONS.md). Remaining: a bounded serving demo using Gold-format
-   features (never pandas-recomputed features), orchestrated retraining, and
-   alerts. No serving endpoint exists.
-3. **Safety RAG** (docs/SAFETY_RAG.md): source, license, privacy
-   minimization, cost check and the Gold `osha_documents` table are done. The
-   user chose exact retrieval with **no Vector Search endpoint**. Next: the
-   Qwen3 embedding job via `ai_query`, exact top-k retrieval with an evaluation
-   set built from OSHA codes, then grounded answers (GPT-OSS-120B) with
-   `[report_id]` citations and abstention, MLflow tracing, an LLM-judge
-   evaluation (Llama 3.3 70B), and structured extraction scored against the codes.
-4. **Remaining platform:** API ingestion and Event Hubs streaming, AI/BI dashboard
-   and Genie, environment isolation and service-principal/OIDC staging/prod
-   delivery, appropriate networking/governance, demo script and portfolio polish.
+The task list and recommended order live in the **Task status** section at the
+top of `docs/STATUS.md`; keep that table current rather than a copy here. At
+the time of this handover the next items are:
+
+1. **Grounded answers:** retrieve with `ExactIndex` over 256-dimension
+   truncated vectors (question embedded with `format_query`), answer with
+   GPT-OSS-120B (pay-per-token) using `[report_id]` citations, abstain when
+   evidence is weak (calibrate on in-domain unanswerable questions), trace with
+   MLflow, and evaluate with an LLM judge from a different model family.
+2. **Structured extraction** of event, nature, body part and source, scored
+   against OSHA's codes.
+3. **Then:** orchestrated retraining and alerts for the RUL model,
+   dashboard/Genie, a bounded serving demo, API/streaming sources, and
+   environments with OIDC CI/CD.
+
+Keep train and test trajectories separate. Test RUL must come from official
+endpoint labels. Serving and scoring must use Spark-computed Gold features,
+never pandas-recomputed ones.
 
 Current CI is a local GitHub Actions workflow definition running Python tests;
 no GitHub repository, remote, OIDC federation or CD deployment has been created.
