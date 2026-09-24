@@ -100,8 +100,11 @@ this timeout reduces exposure but is not a hard billing cap.
    reports can't answer. The manual job `osha_answer_eval` traces every
    question in MLflow. On 28 held-out questions it made 28/28 correct
    answer/decline decisions; a Llama 3.3 judge passed 11/12 answers for
-   correctness and 12/12 for groundedness. Next: structured extraction
-   scored against OSHA codes.
+   correctness and 12/12 for groundedness. The manual job
+   `osha_extraction_eval` codes narratives into event, nature, body part and
+   source, scored against OSHA's codes (harmonized across OSHA's 2024 coding
+   change). With no training labels, GPT-OSS-120B matches a supervised TF-IDF
+   model on three fields (≈ 0.94 accuracy) but trails on source (0.76 vs 0.83).
    See [docs/SAFETY_RAG.md](docs/SAFETY_RAG.md). Data courtesy of the U.S.
    Department of Labor (OSHA); no endorsement implied.
 4. Add Event Hubs/API sources, dashboard/Genie and OIDC staging/production CI/CD.

@@ -1,7 +1,7 @@
 # SentinelOps — handover for the next session
 
-Last updated: September 24, 2026, 06:45 UTC. Git `main` is clean; the
-latest commit is the grounded-answers milestone (see section 6).
+Last updated: September 24, 2026, 07:50 UTC. Git `main` is clean; the
+latest commit is the structured-extraction milestone (see section 6).
 
 **Where things stand.** Both halves of the portfolio project run in Azure
 Databricks.
@@ -18,7 +18,10 @@ Databricks.
     citations, a calibrated decline rule and MLflow tracing. On 28 held-out
     questions: 28/28 correct decisions; the Llama 3.3 judge passed correctness
     11/12 and groundedness 12/12.
-  - **The next task is structured extraction.**
+  - Structured extraction (event, nature, body part, source) scored against
+    harmonized OSHA codes. GPT-OSS-120B matches a supervised TF-IDF model on
+    three fields but trails on source (0.760 vs 0.825).
+- **The next task is orchestrated retraining and alerts** (RUL side).
 
 The authoritative task tracker is the **Task status** table at the top of
 [docs/STATUS.md](docs/STATUS.md). Update it as work lands.
@@ -28,15 +31,15 @@ The authoritative task tracker is the **Task status** table at the top of
 1. Read, in this order:
    - this file;
    - `docs/STATUS.md` (task table + current milestone);
-   - `docs/SAFETY_RAG.md` (design, measurements, retrieval and answer evaluation);
-   - `docs/OPERATIONS.md` and `docs/INGESTION.md` only if touching the RUL side;
+   - `docs/SAFETY_RAG.md` (design, measurements, retrieval, answer and extraction evaluations);
+   - `docs/OPERATIONS.md` and `docs/INGESTION.md` (needed for the next task);
    - `SentinelOps.md` for the full intended scope.
 2. Verify the environment and that nothing is running (all free):
 
 ```powershell
 . ./scripts/Use-SentinelOps.ps1
 az account show --query '{name:name,id:id,user:user.name}' -o json
-.venv/Scripts/python.exe -m pytest -q                      # expect 57 passed
+.venv/Scripts/python.exe -m pytest -q                      # expect 64 passed
 .tools/databricks/databricks.exe bundle validate --strict -t dev
 .tools/databricks/databricks.exe jobs list-runs --active-only -o json
 .tools/databricks/databricks.exe clusters list -o json
@@ -78,42 +81,46 @@ az rest --method post --url 'https://management.azure.com/subscriptions/b1026367
   endorsement. Never use the assistant to identify individuals or employers.
   Landing files are immutable; don't re-upload the quality probe or OSHA files.
 
-## 3. Next task in detail: structured extraction
+## 3. Next task in detail: orchestrated retraining and alerts
 
-The goal: extract **event, nature of injury, body part and source** from each
-narrative, and score the extractions against OSHA's own codes in
-`gold.osha_documents`. Suggested approach (check current `ai_query`
-`responseFormat` support for the chosen model in official docs first):
+The GenAI side is complete up to deployment, so the recommended order returns
+to the RUL side. Read `docs/OPERATIONS.md` and `docs/INGESTION.md` first.
 
-1. **Extract from the narrative only.** The Gold `document` header repeats
-   the code titles, so extracting from it would leak the answer.
-2. **Use a JSON schema** with `ai_query(..., responseFormat => ...)` and
-   `failOnError => false`. Write results **once** to a staging table (see
-   `jobs/embed_osha.py`), then validate against the schema in code.
-3. **Score at two levels:** the OIICS division (the first digit of
-   `event_code`, e.g. 4 = falls, slips, trips; similar prefixes for
-   nature/body part/source) and the exact title. Report per-field accuracy
-   against a majority-class baseline.
-4. **Dev/test discipline, as with answers:** tune the prompt on a small dev
-   sample and report on a separate held-out stratified sample (for example
-   1,000 reports; a few hundred thousand tokens, cheap). Consider comparing
-   `databricks-gpt-oss-20b` with 120B on cost.
-5. Add a manual bundle job like the others; `tests/test_bundle.py` enforces
-   the guardrails. Rehearse locally first on the real narratives.
+1. **One manual multi-task job** chaining the existing steps: ingest
+   (pipeline task on `cmapss_medallion`) → verify → train → promote → score →
+   monitor. Use `depends_on`; keep the task code and parameters of the current
+   jobs, and keep those jobs for single-step use. Follow the usual guardrails
+   (STANDARD, one concurrent run, zero retries, task and job timeouts, no
+   schedule); `tests/test_bundle.py` enforces them. Running as one job also
+   prevents concurrent Gold reads during a refresh.
+   - `cmapss_promote` records a rejection as a tag and exits 0; it fails only
+     when no `@challenger` exists. Scoring then continues with the current
+     `@champion`, which is the intended behavior.
+   - A full chain is roughly 40 minutes of serverless (ingest ~12, verify ~6,
+     train ~6.5, promote ~6.4, score/monitor ~9.3), ≈ CAD 0.6. State that
+     before running.
+2. **Alerts without a SQL warehouse.** Add a final task that reads the newest
+   snapshots in `gold.cmapss_model_performance` and `gold.cmapss_feature_drift`
+   and fails when thresholds are breached. Set the thresholds in advance,
+   relative to each model version's first snapshot (for example, endpoint RMSE
+   up more than 20%, or any `psi_age_matched` > 0.2), never from test RMSE.
+   Job email notifications on failure would make it an alert; **ask the user**
+   before configuring notifications or an address. Databricks SQL alerts would
+   need warehouse time while evaluating.
+3. Rehearse locally, then run the chain once end to end. Exercise the alert
+   path with a deliberately impossible threshold in a separate run, and record
+   the evidence under `docs/`.
 
-**What exists for answers** (reuse, don't rebuild):
-- `sentinelops.answers`: `Assistant` (retrieve → decline or generate → check
-  citations, one MLflow trace per question), `ChatClient` (REST with visible
-  429/5xx retries), the prompt (`PROMPT_VERSION` v3) and the citation checks.
-- `sentinelops.answer_eval`: the DEV set (used for prompt tuning) and the
-  held-out EVAL set, `calibrate_threshold`, `evaluate_assistant` (a
-  `mlflow.genai.evaluate` wrapper with code scorers and Llama 3.3 judges) and
-  `summarize`.
-- Job `osha_answer_eval` (`jobs/evaluate_answers.py`). Evidence:
-  `docs/osha-answer-eval.json`; design and caveats are in `docs/SAFETY_RAG.md`.
-- Before any deployment: a larger answer evaluation with more in-domain
-  unanswerable questions near the 0.6511 threshold. The threshold caught 5 of
-  11 such questions, one by only 0.0016.
+**What exists on the GenAI side** (reuse, don't rebuild):
+- `sentinelops.answers` / `answer_eval` and job `osha_answer_eval`: grounded
+  answers, code-checked citations, a calibrated decline rule, MLflow traces,
+  and the held-out evaluation (`docs/osha-answer-eval.json`). Before any
+  deployment, run a larger evaluation with more in-domain unanswerable
+  questions near the 0.6511 threshold.
+- `sentinelops.extraction` and job `osha_extraction_eval`: harmonized OIICS
+  truth (OSHA changed codes in 2024), a JSON-schema prompt (v3), validation and
+  scoring. Raw outputs are in `gold.osha_extractions`; evidence is in
+  `docs/osha-extraction-eval.json`.
 
 ## 4. Lessons already paid for — don't relearn them
 
@@ -141,6 +148,10 @@ narrative, and score the extractions against OSHA's own codes in
 | Local MLflow with a SQLite store writes `./mlruns` | Create the experiment with an explicit `artifact_location` (tests use a temp dir) or run from the scratchpad |
 | Keyword share overstates question support | 88 "grain bin/engulf" matches, but only one grain-engulfment narrative. Read matching narratives before writing a question |
 | Cost Management query returns HTTP 429 | It throttles bursts; retry after a few minutes |
+| OSHA codes aren't comparable across 2024 | OIICS codes and titles changed ("Fractures" 111 → 124; hips moved from trunk to lower extremities). Score on divisions harmonized by `sentinelops.extraction.truth`, never on raw code prefixes |
+| Chat endpoints return 429 to parallel REST calls | GPT-OSS rejected 4 concurrent requests; use 2 locally. `ai_query` batched 1,051 extractions with 0 failures |
+| GPT-OSS ignores a rule the schema order undercuts | It named the object tripped over in `source_object`, then categorized it. Put the rule inside the field the model writes first |
+| GPT-OSS-20B returns empty content | At medium effort it can spend all `max_tokens` on reasoning (1.1% of test rows). Count these as invalid; prefer 120B |
 
 ## 5. Resources
 
@@ -166,6 +177,7 @@ with the CLI (`infra/uc-*.json`). Bundle `sentinelops`, target `dev`.
 | pipeline `osha_safety` | `7d53a0fb-d724-4628-a854-23dc1d0e283a` | OSHA Bronze→Silver→Gold |
 | job `osha_ingest` / `osha_embed` / `osha_retrieval_eval` | `1070808576153729` / `379147303783128` / `383639217735446` | Ingest / embed / evaluate retrieval |
 | job `osha_answer_eval` | `1029765841933443` | Grounded answers on held-out questions + Llama 3.3 judges (run `745084593826476`) |
+| job `osha_extraction_eval` | `804198192778755` | Structured extraction vs OSHA codes and baselines (run `570236144351626`) |
 
 All jobs are manual, STANDARD, one concurrent run, zero retries, with
 timeouts and no schedules. Pipelines are triggered serverless with
@@ -175,9 +187,9 @@ development mode off.
   (Gold-trained); v2 bootstrap, no alias.
 - MLflow experiments: `sentinelops-fd001` `2331823695746663`,
   `sentinelops-safety-rag` `3423406210325716`. The latter holds retrieval
-  eval v1/v2 and answer eval run `17406be7875d4a2387785faf3ea9f083` (28
+  eval v1/v2, answer eval run `17406be7875d4a2387785faf3ea9f083` (28
   traces, default experiment trace storage; UC trace tables would need a SQL
-  warehouse).
+  warehouse) and extraction eval run `840d418d57f64dc894892467a09641f0`.
 - An idle pipeline `kinesis_ingestion` exists in the workspace. It isn't part
   of this bundle; leave it alone unless the user says otherwise.
 - Landing volume `sentinelops_dev.sentinelops_dev.landing`:
@@ -187,7 +199,7 @@ development mode off.
 - Tables:
   - `bronze.{cmapss_lines, cmapss_labels, osha_sir_reports}`
   - `silver.{cmapss_observations, cmapss_quarantine, cmapss_conflicts, cmapss_endpoint_labels, osha_incidents, osha_quarantine}`
-  - `gold.{cmapss_features, cmapss_training_labels, cmapss_test_endpoints, cmapss_predictions, cmapss_model_performance, cmapss_feature_drift, osha_documents, osha_embeddings}`
+  - `gold.{cmapss_features, cmapss_training_labels, cmapss_test_endpoints, cmapss_predictions, cmapss_model_performance, cmapss_feature_drift, osha_documents, osha_embeddings, osha_extractions}`
   - bootstrap `sentinelops_dev.{silver_fd001_train, gold_fd001_features, gold_fd001_predictions}`
 
 ## 6. Local workspace and tools
@@ -207,9 +219,9 @@ development mode off.
   numpy 2.5.3, pandas 2.3.3, scikit-learn 1.9.1, MLflow 3.16.1, skops 0.15.0,
   databricks-sdk 0.140.0. Keep local and cloud versions consistent.
 - Git: branch `main`, author Cheng Huang <cheng.huang.ca@outlook.com>
-  (repo-local config), 7 commits, no remote. The latest commit is the
-  grounded-answers milestone. The CI workflow in `.github/workflows/ci.yml`
-  has never run.
+  (repo-local config), 8 commits, no remote. The latest commit is the
+  structured-extraction milestone. The CI workflow in
+  `.github/workflows/ci.yml` has never run.
 
 ## 7. Working agreement that has served well
 

@@ -135,8 +135,8 @@ class ChatClient:
     RETRY_STATUSES = {429, 500, 502, 503, 504}
 
     def __init__(self, host: str, auth: Callable[[], dict], endpoint: str = MODEL, *, max_tokens: int = 2048,
-                 temperature: float = 0.0, reasoning_effort: str | None = "low", timeout: float = 120,
-                 retries: int = 4, backoff_seconds: float = 2.0, post=None, sleep=time.sleep):
+                 temperature: float = 0.0, reasoning_effort: str | None = "low", response_format: dict | None = None,
+                 timeout: float = 120, retries: int = 4, backoff_seconds: float = 2.0, post=None, sleep=time.sleep):
         if post is None:
             import requests
             post = requests.post
@@ -145,6 +145,8 @@ class ChatClient:
         self.params = {"max_tokens": max_tokens, "temperature": temperature}
         if reasoning_effort:
             self.params["reasoning_effort"] = reasoning_effort
+        if response_format:
+            self.params["response_format"] = response_format
         self.timeout, self.retries, self.backoff_seconds = timeout, retries, backoff_seconds
 
     @classmethod

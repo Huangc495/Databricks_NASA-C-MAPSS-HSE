@@ -143,3 +143,42 @@ resources:
               - pandas==2.3.3
               - mlflow==3.16.1
               - databricks-sdk==0.140.0
+    # Manual only. Codes held-out OSHA narratives (event, nature, body part, source) with
+    # ai_query + a JSON schema for each model, stores raw outputs once in gold.osha_extractions,
+    # and scores them against OSHA's codes, a majority baseline and a supervised baseline.
+    osha_extraction_eval:
+      name: sentinelops-osha-extraction-eval
+      max_concurrent_runs: 1
+      timeout_seconds: 3600
+      performance_target: STANDARD
+      tasks:
+        - task_key: evaluate
+          max_retries: 0
+          timeout_seconds: 3600
+          spark_python_task:
+            python_file: ../jobs/evaluate_extraction.py
+            parameters:
+              - --catalog
+              - ${var.catalog}
+              - --models
+              - databricks-gpt-oss-120b,databricks-gpt-oss-20b
+              - --reasoning-effort
+              - medium
+              - --max-tokens
+              - '2048'
+              - --partitions
+              - '4'
+              - --job-run-id
+              - '{{job.run_id}}'
+              - --source-root
+              - ${workspace.file_path}/src
+          environment_key: extraction
+      environments:
+        - environment_key: extraction
+          spec:
+            environment_version: '4'
+            dependencies:
+              - numpy==2.5.3
+              - pandas==2.3.3
+              - scikit-learn==1.9.1
+              - mlflow==3.16.1

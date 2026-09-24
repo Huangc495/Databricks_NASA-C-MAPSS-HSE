@@ -1,0 +1,399 @@
+{
+  "job_id": 804198192778755,
+  "run_id": 570236144351626,
+  "result": "SUCCESS",
+  "run_minutes": {
+    "setup": 3.3,
+    "execution": 10.2,
+    "total": 13.5
+  },
+  "mlflow_run_id": "840d418d57f64dc894892467a09641f0",
+  "prompt_version": "osha-extraction-prompt-v3",
+  "documents": 105993,
+  "splits": {
+    "train": 104828,
+    "test": 1051,
+    "dev": 114
+  },
+  "harmonized_truth_changes": {
+    "event": 69,
+    "body_part": 3932,
+    "source": 371
+  },
+  "scoreable_test": {
+    "event": 1042,
+    "nature": 959,
+    "body_part": 1019,
+    "source": 1027
+  },
+  "test_by_era": {
+    "2015-23": 874,
+    "2024-25": 177
+  },
+  "majority_labels": {
+    "event": "contact_with_object",
+    "nature": "fracture",
+    "body_part": "upper_extremities",
+    "source": "machinery"
+  },
+  "scores": {
+    "majority": {
+      "event": {
+        "scored": 1042,
+        "accuracy": 0.4923,
+        "macro_f1": 0.0943,
+        "accuracy_by_era": {
+          "2015-23": 0.4988,
+          "2024-25": 0.4602
+        }
+      },
+      "nature": {
+        "scored": 959,
+        "accuracy": 0.3879,
+        "macro_f1": 0.0466,
+        "accuracy_by_era": {
+          "2015-23": 0.3909,
+          "2024-25": 0.3735
+        }
+      },
+      "body_part": {
+        "scored": 1019,
+        "accuracy": 0.4387,
+        "macro_f1": 0.0871,
+        "accuracy_by_era": {
+          "2015-23": 0.445,
+          "2024-25": 0.408
+        }
+      },
+      "source": {
+        "scored": 1027,
+        "accuracy": 0.2775,
+        "macro_f1": 0.0483,
+        "accuracy_by_era": {
+          "2015-23": 0.282,
+          "2024-25": 0.2557
+        }
+      }
+    },
+    "supervised_tfidf_logreg": {
+      "event": {
+        "scored": 1042,
+        "accuracy": 0.9434,
+        "macro_f1": 0.8587,
+        "accuracy_by_era": {
+          "2015-23": 0.9446,
+          "2024-25": 0.9375
+        }
+      },
+      "nature": {
+        "scored": 959,
+        "accuracy": 0.9426,
+        "macro_f1": 0.8389,
+        "accuracy_by_era": {
+          "2015-23": 0.9445,
+          "2024-25": 0.9337
+        }
+      },
+      "body_part": {
+        "scored": 1019,
+        "accuracy": 0.9392,
+        "macro_f1": 0.8874,
+        "accuracy_by_era": {
+          "2015-23": 0.9408,
+          "2024-25": 0.931
+        }
+      },
+      "source": {
+        "scored": 1027,
+        "accuracy": 0.8247,
+        "macro_f1": 0.7943,
+        "accuracy_by_era": {
+          "2015-23": 0.8261,
+          "2024-25": 0.8182
+        }
+      }
+    },
+    "databricks-gpt-oss-120b": {
+      "event": {
+        "scored": 1042,
+        "accuracy": 0.9347,
+        "macro_f1": 0.8781,
+        "accuracy_by_era": {
+          "2015-23": 0.9411,
+          "2024-25": 0.9034
+        }
+      },
+      "nature": {
+        "scored": 959,
+        "accuracy": 0.9426,
+        "macro_f1": 0.7598,
+        "accuracy_by_era": {
+          "2015-23": 0.9407,
+          "2024-25": 0.9518
+        }
+      },
+      "body_part": {
+        "scored": 1019,
+        "accuracy": 0.948,
+        "macro_f1": 0.9087,
+        "accuracy_by_era": {
+          "2015-23": 0.9515,
+          "2024-25": 0.931
+        }
+      },
+      "source": {
+        "scored": 1027,
+        "accuracy": 0.7595,
+        "macro_f1": 0.7442,
+        "accuracy_by_era": {
+          "2015-23": 0.7626,
+          "2024-25": 0.7443
+        }
+      }
+    },
+    "databricks-gpt-oss-20b": {
+      "event": {
+        "scored": 1042,
+        "accuracy": 0.8868,
+        "macro_f1": 0.7096,
+        "accuracy_by_era": {
+          "2015-23": 0.888,
+          "2024-25": 0.8807
+        }
+      },
+      "nature": {
+        "scored": 959,
+        "accuracy": 0.9208,
+        "macro_f1": 0.6929,
+        "accuracy_by_era": {
+          "2015-23": 0.9193,
+          "2024-25": 0.9277
+        }
+      },
+      "body_part": {
+        "scored": 1019,
+        "accuracy": 0.9392,
+        "macro_f1": 0.7958,
+        "accuracy_by_era": {
+          "2015-23": 0.9408,
+          "2024-25": 0.931
+        }
+      },
+      "source": {
+        "scored": 1027,
+        "accuracy": 0.6952,
+        "macro_f1": 0.6148,
+        "accuracy_by_era": {
+          "2015-23": 0.7015,
+          "2024-25": 0.6648
+        }
+      }
+    }
+  },
+  "comparisons_vs_supervised": {
+    "databricks-gpt-oss-120b": {
+      "event": {
+        "difference": -0.0086,
+        "ci95": [
+          -0.025,
+          0.0077
+        ],
+        "reports": 1042
+      },
+      "nature": {
+        "difference": 0.0,
+        "ci95": [
+          -0.0167,
+          0.0157
+        ],
+        "reports": 959
+      },
+      "body_part": {
+        "difference": 0.0088,
+        "ci95": [
+          -0.0059,
+          0.0226
+        ],
+        "reports": 1019
+      },
+      "source": {
+        "difference": -0.0652,
+        "ci95": [
+          -0.0935,
+          -0.038
+        ],
+        "reports": 1027
+      }
+    },
+    "databricks-gpt-oss-20b": {
+      "event": {
+        "difference": -0.0566,
+        "ci95": [
+          -0.0749,
+          -0.0393
+        ],
+        "reports": 1042
+      },
+      "nature": {
+        "difference": -0.0219,
+        "ci95": [
+          -0.0417,
+          -0.0042
+        ],
+        "reports": 959
+      },
+      "body_part": {
+        "difference": 0.0,
+        "ci95": [
+          -0.0167,
+          0.0157
+        ],
+        "reports": 1019
+      },
+      "source": {
+        "difference": -0.1295,
+        "ci95": [
+          -0.1607,
+          -0.1003
+        ],
+        "reports": 1027
+      }
+    },
+    "databricks-gpt-oss-120b_vs_databricks-gpt-oss-20b": {
+      "event": {
+        "difference": 0.048,
+        "ci95": [
+          0.0326,
+          0.0653
+        ],
+        "reports": 1042
+      },
+      "nature": {
+        "difference": 0.0219,
+        "ci95": [
+          0.0083,
+          0.0355
+        ],
+        "reports": 959
+      },
+      "body_part": {
+        "difference": 0.0088,
+        "ci95": [
+          -0.0039,
+          0.0216
+        ],
+        "reports": 1019
+      },
+      "source": {
+        "difference": 0.0643,
+        "ci95": [
+          0.0409,
+          0.0896
+        ],
+        "reports": 1027
+      }
+    }
+  },
+  "invalid_outputs": {
+    "databricks-gpt-oss-120b": {},
+    "databricks-gpt-oss-20b": {
+      "empty response": 12
+    }
+  },
+  "calls": {
+    "databricks-gpt-oss-120b": {
+      "pending": 1051,
+      "failed": 0,
+      "seconds": 221.4,
+      "sample_error": null
+    },
+    "databricks-gpt-oss-20b": {
+      "pending": 1051,
+      "failed": 0,
+      "seconds": 62.8,
+      "sample_error": null
+    }
+  },
+  "supervised_fit_seconds": {
+    "event": 32.8,
+    "nature": 41.7,
+    "body_part": 35.6,
+    "source": 45.2
+  },
+  "seconds": 587.1,
+  "largest_source_errors_test": {
+    "databricks-gpt-oss-120b": {
+      "machinery->tools_instruments_equipment": 33,
+      "machinery->parts_and_materials": 26,
+      "parts_and_materials->machinery": 14,
+      "containers_furniture_fixtures->parts_and_materials": 12
+    },
+    "databricks-gpt-oss-20b": {
+      "machinery->parts_and_materials": 71,
+      "machinery->tools_instruments_equipment": 27,
+      "containers_furniture_fixtures->parts_and_materials": 18,
+      "vehicles->parts_and_materials": 16
+    }
+  },
+  "largest_event_errors_test": {
+    "databricks-gpt-oss-120b": {
+      "transportation->contact_with_object": 18
+    },
+    "databricks-gpt-oss-20b": {
+      "transportation->contact_with_object": 41
+    }
+  },
+  "dev_history": {
+    "split": "114 dev reports, run locally over REST; the test split was not run before the job",
+    "v1_120b_low": {
+      "event": 0.912,
+      "nature": 0.933,
+      "body_part": 0.916,
+      "source": 0.709
+    },
+    "v2_120b_low": {
+      "event": 0.947,
+      "nature": 0.943,
+      "body_part": 0.944,
+      "source": 0.718
+    },
+    "v3_120b_low": {
+      "event": 0.929,
+      "nature": 0.933,
+      "body_part": 0.953,
+      "source": 0.773
+    },
+    "v3_120b_medium": {
+      "event": 0.929,
+      "nature": 0.943,
+      "body_part": 0.953,
+      "source": 0.818
+    },
+    "v3_20b_low": {
+      "event": 0.929,
+      "nature": 0.914,
+      "body_part": 0.925,
+      "source": 0.636
+    },
+    "v3_20b_medium": {
+      "event": 0.894,
+      "nature": 0.905,
+      "body_part": 0.925,
+      "source": 0.736,
+      "empty_responses": 3
+    },
+    "supervised_dev": {
+      "event": 0.929,
+      "nature": 0.952,
+      "body_part": 0.944,
+      "source": 0.873
+    }
+  },
+  "cost_estimate_cad": {
+    "note": "ai_query returns no token counts; tokens estimated from dev averages (1,820 in; 372 out for 120B, 441 out for 20B at medium)",
+    "gpt_oss_120b": 0.73,
+    "gpt_oss_20b": 0.38,
+    "serverless_13_5_min": 0.21,
+    "local_dev_runs": 0.35
+  }
+}

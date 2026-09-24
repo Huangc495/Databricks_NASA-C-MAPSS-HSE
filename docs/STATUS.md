@@ -1,6 +1,6 @@
 # Build status
 
-Last verified: September 24, 2026 (grounded answers).
+Last verified: September 24, 2026 (structured extraction).
 
 ## Task status
 
@@ -14,7 +14,7 @@ cost or prerequisites, with the reason given.
 | Task | Status | Evidence or next action |
 |---|---|---|
 | Azure foundation: ADLS Gen2, workspace, access connector, UC catalog | Done | `infra/main.bicep`; "Azure" section below |
-| Bundle deployment (dev target, strict validation, manual jobs) | Done | `databricks.yml`, `resources/*.yml`; 10 jobs and 2 pipelines deployed; a test enforces job guardrails |
+| Bundle deployment (dev target, strict validation, manual jobs) | Done | `databricks.yml`, `resources/*.yml`; 11 jobs and 2 pipelines deployed; a test enforces job guardrails |
 | Cost visibility: meter-level Azure cost query | Done | Found an always-on NAT gateway/IP, ~CAD 1.7/day ("Cost and runtime controls") |
 | Azure budget alert | Not started | Cheap safeguard for the $10/day limit; needs your approval to create |
 | Databricks billing tables (`system.billing`) access | Not started | Needs an account/metastore admin grant |
@@ -41,7 +41,7 @@ cost or prerequisites, with the reason given.
 | Fleet batch scoring into an idempotent inference log | Done | `gold.cmapss_predictions`; `fleet-scoring-*.json` |
 | Delayed-label performance and age-matched drift monitoring | Done | `gold.cmapss_model_performance`, `gold.cmapss_feature_drift` |
 | Alerts on drift and performance tables | Not started | Needs thresholds, and a SQL warehouse only while an alert evaluates |
-| Orchestrated retraining (ingest → verify → train → promote → score) | Not started | Also prevents concurrent Gold reads |
+| Orchestrated retraining (ingest → verify → train → promote → score) | **Next** | Also prevents concurrent Gold reads |
 | Real-time serving demo with Gold-format features | Not started | Bounded demo; delete the endpoint afterwards |
 | Hyperparameter tuning, `mlflow.evaluate`, sequence baseline | Not started | |
 | Lakehouse Monitoring inference profile | Not started (optional) | Job-computed metrics already cover the demo |
@@ -58,24 +58,67 @@ cost or prerequisites, with the reason given.
 | Exact retrieval + code-based retrieval evaluation (1,024 vs 256 dimensions) | Done | Dense P@10 0.882 vs TF-IDF 0.786; 256 dims = 1,024 quality at 1/4 memory; `osha-retrieval-eval.json` |
 | Grounded answers with `[report_id]` citations, abstention, MLflow tracing | Done | GPT-OSS-120B over 256-dim retrieval; code-checked citations; threshold 0.6511 + model decline; `osha-answer-eval.json` |
 | LLM-judge evaluation (correctness, groundedness, relevance) | Done (28 held-out questions) | Llama 3.3 70B judge: 28/28 correct answer/decline decisions; on answers, correctness 11/12, groundedness 12/12. A larger set is still needed before deployment |
-| Structured extraction scored against OSHA codes | **Next** | `ai_query` with a JSON-schema `responseFormat`; score event, nature, body part and source |
+| Structured extraction scored against OSHA codes | Done | GPT-OSS-120B matches a supervised TF-IDF model on event, nature and body part (0.935/0.943/0.948) but trails on source (0.760 vs 0.825); `osha-extraction-eval.json` |
 | Agent deployment / review app | Deferred | Check serving cost first; scale-to-zero only |
 
 ### Analytics and delivery
 
 | Task | Status | Evidence or next action |
 |---|---|---|
-| Unit tests (57) and local CI workflow file | Done (local) | `.github/workflows/ci.yml` has never run: no remote |
+| Unit tests (64) and local CI workflow file | Done (local) | `.github/workflows/ci.yml` has never run: no remote |
 | Git history | Done (local) | Branch `main`; no remote |
 | GitHub repository, CI runs, OIDC deployment to staging/prod | Not started | Needs your choice of repository and visibility |
 | AI/BI dashboard and Genie space | Not started | Viewing uses SQL warehouse time |
 | Demo script and portfolio write-up | Not started | Last |
 
-Recommended order: structured extraction → orchestrated retraining and alerts →
-dashboard/Genie → serving demo → API/streaming sources → environments and CI/CD.
-A larger answer evaluation comes before any assistant deployment.
+Recommended order: orchestrated retraining and alerts → dashboard/Genie → serving
+demo → API/streaming sources → environments and CI/CD. A larger answer
+evaluation comes before any assistant deployment.
 
-## Current milestone: Safety GenAI grounded answers (OSHA)
+## Current milestone: Safety GenAI structured extraction (OSHA)
+
+LLMs now code OSHA narratives into event, nature of injury, body part and
+source. The results are scored against OSHA's own coding, next to a majority
+baseline and a supervised baseline. Details:
+[SAFETY_RAG.md](SAFETY_RAG.md#structured-extraction-osha_extraction_eval).
+
+- **The answer key was fixed first.** OSHA changed its codes in 2024 (for
+  example, "Fractures" 111 → 124), so raw code prefixes aren't consistent
+  labels. Truth uses the OIICS division for event, body part and source,
+  harmonized to the current scheme: hips now count as lower extremities, which
+  changed 3,932 body-part labels. Nature uses ordered title rules for 12 injury
+  types. Nonclassifiable and nonspecific truth isn't scored.
+- **Job `osha_extraction_eval`** (`804198192778755`), run `570236144351626`
+  **SUCCESS** (13.5 min, 3.3 of them setup), MLflow run
+  `840d418d57f64dc894892467a09641f0`.
+  - `ai_query` with a strict JSON schema, medium reasoning, 1,051 held-out
+    reports per model, 0 failed calls (221 s for 120B, 63 s for 20B).
+  - Raw outputs are stored once in the new `gold.osha_extractions`, with
+    primary key `(report_id, model, prompt_version)`; code validates them.
+- **Test accuracy** (majority / supervised TF-IDF / GPT-OSS-120B / 20B):
+
+  | Field | Majority | Supervised | 120B | 20B |
+  |---|---|---|---|---|
+  | Event | 0.492 | 0.943 | 0.935 | 0.887 |
+  | Nature | 0.388 | 0.943 | 0.943 | 0.921 |
+  | Body part | 0.439 | 0.939 | 0.948 | 0.939 |
+  | Source | 0.278 | 0.825 | 0.760 | 0.695 |
+
+  - 120B minus supervised: event −0.009 [−0.025, 0.008], nature 0.000, body
+    part +0.009 (confidence intervals include 0), source −0.065 [−0.093,
+    −0.038].
+  - 120B's main source errors: machinery coded as tools or as parts.
+  - 20B is significantly worse on event, nature and source, with 12 empty
+    responses.
+- **Prompt development was confined to 114 dev reports** (v1 → v3, plus a
+  low vs medium effort comparison). The test split wasn't run before the job.
+- Cost: ≈ CAD 1.1 of model calls (estimated; `ai_query` returns no token
+  counts) plus ≈ CAD 0.2 of serverless and ≈ CAD 0.35 of local dev calls.
+  Nothing is running afterwards.
+- Tests: 64 pass (7 new: split, harmonization, nature rules, schema/prompt
+  labels, parsing, scoring, bootstrap).
+
+## Earlier milestone: Safety GenAI grounded answers (OSHA)
 
 The assistant now answers from retrieved OSHA reports. It cites report IDs,
 code checks the citations, and it declines when the reports can't answer.

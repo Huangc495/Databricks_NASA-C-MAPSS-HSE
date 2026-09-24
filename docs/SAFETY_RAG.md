@@ -1,4 +1,4 @@
-# Safety GenAI assistant: sources, privacy, retrieval and grounded answers
+# Safety GenAI assistant: sources, privacy, retrieval, answers and extraction
 
 Goal: answer safety questions ("What typically causes amputations on press brakes?")
 from OSHA Severe Injury Report narratives. Answers must cite report IDs and say
@@ -69,6 +69,7 @@ CAD; DBU rates from the Databricks pricing pages).
 | Embeddings with Qwen3 Embedding 0.6B: 0.286 DBU per 1M tokens | ~CAD 0.03 per 1M tokens. The narratives are ~4.8M tokens; with headers the documents are ~9–10M tokens, ~CAD 0.27. |
 | GTE Large: 1.857 DBU per 1M tokens | ~CAD 0.18 per 1M tokens |
 | GPT-OSS-120B: 2.143 / 8.571 DBU per 1M tokens (in/out) | ~CAD 0.21 / 0.83 per 1M |
+| GPT-OSS-20B: 1.000 / 4.286 DBU per 1M tokens (in/out), checked September 24 | ~CAD 0.10 / 0.42 per 1M |
 | Llama 3.3 70B: 7.143 / 21.429 DBU per 1M tokens (in/out) | ~CAD 0.69 / 2.08 per 1M |
 
 With the always-on ~CAD 1.7/day workspace networking, any day with a Vector
@@ -297,14 +298,127 @@ margin of at least 0.066 over the threshold.
 Evidence: [osha-answer-eval.json](osha-answer-eval.json), including every
 answer.
 
+## Structured extraction (`osha_extraction_eval`)
+
+**Question:** can an LLM code a narrative the way OSHA's coders do (event,
+nature of injury, body part, source), and how does it compare with a cheap
+supervised model trained on OSHA's own labels?
+
+**The answer key had to be fixed first.** OSHA changed its coding in 2024:
+"Fractures" is code 111 in 2015–2023 and 124 in 2024–2025, and falls to a
+lower level moved between 2-digit groups. So raw code prefixes aren't
+consistent labels. `sentinelops.extraction` uses labels that survive the
+change:
+
+- **Event, body part, source:** the OIICS division (first digit). Division
+  shares are stable across the change.
+- **Harmonized truth:** a title that also appears in 2024–25 reports takes its
+  2024–25 division, and hips count as lower extremities (they moved from
+  trunk). This changed 3,932 body-part, 371 source and 69 event labels.
+- **Nature:** the division is uninformative (99.6% "traumatic injuries"), so
+  ordered title rules map titles to 12 injury types (amputation, fracture,
+  burn, …).
+- **Unscored truth:** "nonclassifiable" and nonspecific titles (including
+  "Soreness, pain, hurt-nonspecified injury") can't be recovered from a
+  narrative, so they aren't scored.
+
+**How it runs:**
+
+- The model reads **only the narrative**; the Gold header repeats the code
+  titles.
+- One prompt defines every label, with conventions checked against OSHA's
+  own coding. For example, forklifts count as vehicles, loaders as machinery,
+  ladders as tools; a same-level trip's source is the floor; a forklift
+  pinning a worker is a transportation event.
+- A strict JSON schema with enums constrains the output, and code
+  re-validates every output.
+- `ai_query` with `responseFormat`, medium reasoning effort, temperature 0.
+  Raw responses are stored once in `gold.osha_extractions`, keyed by
+  `(report_id, model, prompt_version)`, so paid calls never repeat. A
+  two-report preflight fails fast on a rejected parameter or an unparseable
+  response.
+- A hash of the report ID splits the data into 104,828 train, 114 dev and
+  1,051 test reports. Baselines: the majority class, and TF-IDF + logistic
+  regression with library defaults, trained on the train split.
+
+**Prompt development on the 114 dev reports only** (run locally over REST;
+the test split wasn't run before the job):
+
+| Dev, GPT-OSS-120B | Event | Nature | Body part | Source |
+|---|---|---|---|---|
+| v1, low effort | 0.912 | 0.933 | 0.916 | 0.709 |
+| v2: OSHA conventions added | 0.947 | 0.943 | 0.944 | 0.718 |
+| v3: source rules before `source_object` | 0.929 | 0.933 | 0.953 | 0.773 |
+| v3, medium effort (chosen) | 0.929 | 0.943 | 0.953 | 0.818 |
+
+In v2 the model named the object tripped over and categorized it, despite the
+rule; defining `source_object` by the rules fixed part of that. Medium effort
+roughly tripled output tokens.
+
+**Results** (run `570236144351626`, MLflow `840d418d57f64dc894892467a09641f0`,
+1,051 held-out reports):
+
+| Accuracy | Majority | Supervised TF-IDF | GPT-OSS-120B | GPT-OSS-20B |
+|---|---|---|---|---|
+| Event (1,042 scored) | 0.492 | 0.943 | 0.935 | 0.887 |
+| Nature (959) | 0.388 | 0.943 | 0.943 | 0.921 |
+| Body part (1,019) | 0.439 | 0.939 | 0.948 | 0.939 |
+| Source (1,027) | 0.278 | 0.825 | 0.760 | 0.695 |
+
+- **Without training labels, GPT-OSS-120B matches the supervised model on
+  three fields.** Paired-bootstrap differences (95% CI): event −0.009
+  [−0.025, 0.008], nature 0.000 [−0.017, 0.016], body part +0.009
+  [−0.006, 0.023].
+- **It's worse on source:** −0.065 [−0.093, −0.038]. The largest error types
+  are machinery coded as tools (33) or as parts and materials (26): the model
+  classifies the blade, roller or belt, while OSHA codes the machine. The
+  largest event error is vehicle incidents coded as contact (18).
+- **GPT-OSS-20B is significantly worse than 120B** on event (−0.048), nature
+  (−0.022) and source (−0.064), and it returned 12 empty responses (1.1%),
+  having spent its token budget reasoning. Its 71 errors of machinery coded as
+  parts and materials drive the source gap.
+- Macro-F1 tells the same story, except nature: 120B scores 0.76 there vs 0.84
+  for the supervised model, so it's weaker on rare injury types.
+- Accuracy is similar before and after the 2024 coding change for every
+  method. The largest drop is 120B's event accuracy: 0.941 on 2015–23 vs 0.903
+  on 2024–25 (176 reports).
+- **Throughput:** `ai_query` had no failed calls. It coded 1,051 reports in 221
+  s with 120B and 63 s with 20B. By contrast, direct REST calls hit HTTP 429 at
+  4 concurrent requests.
+
+**What it means:** with 100k labelled reports, the supervised model is the
+cheaper and slightly better auto-coder. The LLM earns its place where no
+labels exist: a new taxonomy, other free-text fields, or a check on human
+coding. There, 120B codes three of four fields at supervised-model accuracy.
+Use 120B, not 20B.
+
+**Caveats:**
+
+- One run, and one test sample of 1,051.
+- Division-level labels only: 7–9 classes, not OSHA's hundreds of codes.
+- The harmonized truth follows my rules.
+- OSHA's own coding isn't perfectly consistent; for example, the same crane
+  incident can be coded to the crane or to the load.
+- The dev set is small (114), so prompt choices carry noise.
+
+**Cost:**
+
+- `ai_query` returns no token counts. Estimated from dev averages: about CAD
+  0.73 (120B) and 0.38 (20B).
+- 13.5 minutes of serverless (≈ CAD 0.21), and about CAD 0.35 of local dev
+  calls.
+
+Evidence: [osha-extraction-eval.json](osha-extraction-eval.json).
+
 ## Next steps
 
 1. Done: exact retrieval and its evaluation (above).
 2. Done: grounded answers with code-checked `[report_id]` citations, a
    calibrated decline rule, MLflow tracing, and a held-out evaluation with a
    Llama 3.3 judge (above).
-3. Structured extraction of event, nature, body part and source from
-   narratives with `ai_query` and a JSON schema, scored against OSHA's codes.
+3. Done: structured extraction scored against harmonized OSHA codes (above).
 4. A larger answer evaluation, with more in-domain unanswerable questions near
    the threshold, before any deployment. Deployment (Agent Framework / review
    app) stays deferred until serving costs are checked.
+5. Optional: code the full corpus with the supervised model (cheap) or 120B,
+   for dashboards on injury types over time.
