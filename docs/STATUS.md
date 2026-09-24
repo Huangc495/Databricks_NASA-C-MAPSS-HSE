@@ -71,9 +71,10 @@ cost or prerequisites, with the reason given.
 | AI/BI dashboard and Genie space | **Next** | Viewing uses SQL warehouse time: needs your go-ahead on warehouse use |
 | Demo script and portfolio write-up | Not started | Last |
 
-Recommended order: dashboard/Genie → serving demo → API/streaming sources →
-environments and CI/CD. A larger answer evaluation comes before any assistant
-deployment.
+Recommended order (details in HANDOVER.md section 3): an Azure budget alert at
+any time → dashboard/Genie → serving demo → a larger answer evaluation, before
+any assistant deployment → API/streaming sources → environments and CI/CD →
+optional ML depth → demo script and write-up.
 
 ## Current milestone: orchestrated retraining and alerts (C-MAPSS)
 

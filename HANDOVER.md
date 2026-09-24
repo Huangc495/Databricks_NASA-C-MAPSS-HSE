@@ -1,30 +1,31 @@
 # SentinelOps — handover for the next session
 
-Last updated: September 24, 2026, 09:10 UTC. Git `main` is clean; the
-latest commit is the orchestrated-retraining milestone (see section 6).
+Last updated: September 24, 2026, 09:20 UTC. Git `main` holds every milestone
+so far (9 commits, no remote); see section 6.
 
 **Where things stand.** Both halves of the portfolio project run in Azure
-Databricks.
+Databricks, and every job is manual, bounded and verified.
 
 - **Predictive maintenance** (NASA C-MAPSS FD001):
   - Auto Loader/Lakeflow ingestion into Bronze/Silver/Gold.
   - Training from Gold, with a validation-gated champion (model version 3).
   - Idempotent fleet batch scoring, with delayed-label and drift monitoring.
-  - One orchestrated job (`cmapss_retrain`) that retrains only when Gold
-    training data changes, followed by threshold alerts.
+  - One orchestrated job (`cmapss_retrain`): it retrains only when Gold
+    training data changes, then runs threshold alerts that fail the run on a
+    breach.
 - **Safety GenAI assistant** (OSHA Severe Injury Reports):
-  - Privacy-minimized ingestion into Gold documents.
-  - Qwen3 embeddings for all 105,993 documents.
-  - Exact retrieval, validated against OSHA-code relevance.
+  - Privacy-minimized ingestion, Qwen3 embeddings for all 105,993 documents,
+    and exact retrieval validated against OSHA-code relevance.
   - Grounded answers (GPT-OSS-120B) with code-checked `[report_id]`
     citations, a calibrated decline rule and MLflow tracing. On 28 held-out
     questions: 28/28 correct decisions; the Llama 3.3 judge passed correctness
     11/12 and groundedness 12/12.
-  - Structured extraction (event, nature, body part, source) scored against
-    harmonized OSHA codes. GPT-OSS-120B matches a supervised TF-IDF model on
-    three fields but trails on source (0.760 vs 0.825).
-- **The next task is the AI/BI dashboard and Genie space** (needs SQL
-  warehouse time; ask first).
+  - Structured extraction scored against harmonized OSHA codes. GPT-OSS-120B
+    matches a supervised TF-IDF model on three fields but trails on source
+    (0.760 vs 0.825).
+- **What's left is in section 3**, in the recommended order. The next task is
+  the AI/BI dashboard and Genie space. It needs SQL warehouse time, so ask
+  first.
 
 The authoritative task tracker is the **Task status** table at the top of
 [docs/STATUS.md](docs/STATUS.md). Update it as work lands.
@@ -35,7 +36,7 @@ The authoritative task tracker is the **Task status** table at the top of
    - this file;
    - `docs/STATUS.md` (task table + current milestone);
    - `docs/SAFETY_RAG.md` (design, measurements, retrieval, answer and extraction evaluations);
-   - `docs/OPERATIONS.md` (orchestration and alerts) and `docs/INGESTION.md`;
+   - `docs/OPERATIONS.md` (orchestration, alerts, serving notes) and `docs/INGESTION.md`;
    - `SentinelOps.md` for the full intended scope.
 2. Verify the environment and that nothing is running (all free):
 
@@ -84,40 +85,128 @@ az rest --method post --url 'https://management.azure.com/subscriptions/b1026367
   endorsement. Never use the assistant to identify individuals or employers.
   Landing files are immutable; don't re-upload the quality probe or OSHA files.
 
-## 3. Next task in detail: AI/BI dashboard and Genie space
+## 3. Remaining work, in the recommended order
+
+Everything below is still to do. The **approval** column lists what must be
+asked of the user before acting (section 2 has the standing rules). Check
+official docs and current prices before each task, and state the cost up
+front.
+
+| # | Task | Approval needed | Cost character |
+|---|---|---|---|
+| 0 | Azure budget alert (any time; cheap safeguard) | Yes: it creates a resource and emails the user | Free |
+| 1 | AI/BI dashboard and Genie space | Yes: SQL warehouse use | Warehouse minutes while queries run (10-min auto-stop) |
+| 2 | Real-time serving demo (C-MAPSS champion) | Yes: a serving endpoint | Bills while provisioned; scale-to-zero; delete afterwards |
+| 3 | Larger answer evaluation, then (optionally) agent deployment and review app | Deployment: yes | Evaluation: pay-per-token cents. Deployment: serving endpoint |
+| 4 | REST API ingestion (for example weather or energy JSON) | Yes: new external data source and download | Serverless job minutes |
+| 5 | Event Hubs (Kafka endpoint) streaming demo | Yes: namespace bills while it exists | Hourly namespace cost; delete afterwards |
+| 6 | Environments and CI/CD: dev/staging/prod catalogs, service principals, `run_as`, secrets, GitHub + OIDC | Yes: repository and visibility, grants, principals | Mostly free |
+| 7 | Optional ML depth: FD002–FD004, hyperparameter tuning, `mlflow.evaluate`, a sequence baseline, Lakehouse Monitoring | Only if it adds billable resources | Serverless job minutes |
+| 8 | Demo script and portfolio write-up | No (publishing anything externally: yes) | Free |
+
+### 0. Azure budget alert
+
+No hard cutoff or alert exists, and later tasks add hourly-billed resources. A
+Cost Management budget on the two SentinelOps resource groups is a free,
+useful first step. Propose a daily-equivalent threshold under $10 and the
+user's email, and get approval before creating it. `system.billing` access
+still needs an account or metastore admin grant, which the user must arrange.
+
+### 1. AI/BI dashboard and Genie space (next)
 
 **This needs SQL warehouse time; ask the user first.** Check the current
-serverless SQL price for `westus2`, state the cost, and use the existing
-Serverless Starter Warehouse (10-minute auto-stop). Stop it when done, and
-confirm it is `STOPPED` in the inventory.
+serverless SQL price for `westus2` and state the cost. Use the existing
+Serverless Starter Warehouse (10-minute auto-stop), and confirm it is
+`STOPPED` in the inventory afterwards.
 
-1. **Dashboard(s) as bundle resources** (`resources: dashboards:` with a
-   `.lvdash.json`), so they deploy and validate like the jobs. Suggested pages:
-   - **Fleet health:** `gold.cmapss_predictions`,
-     `cmapss_model_performance` snapshots by segment, `cmapss_feature_drift`
-     (raw vs age-matched PSI), `cmapss_alerts`.
-   - **Safety:** OSHA injury types over time from `gold.osha_documents` (by
-     division and harmonized category; reuse the `sentinelops.extraction` rules
-     as SQL, or write a small Gold table from them), with DOL attribution.
-     Privacy: `osha_documents` is already minimized; show no narratives in
-     bulk, and never identify workers or employers.
-2. **Genie space** over a small, curated set of Gold tables, with instructions,
-   sample questions and table comments. Check the current API or bundle
-   support for Genie spaces in the docs.
-3. Record the queries' costs (warehouse minutes) and screenshots or JSON
-   evidence under `docs/`.
+1. **Dashboards as bundle resources** (`resources: dashboards:` with a
+   `.lvdash.json`), so they deploy and validate like the jobs:
+   - **Fleet health:** `gold.cmapss_predictions`, `cmapss_model_performance`
+     snapshots by segment, `cmapss_feature_drift` (raw vs age-matched PSI),
+     and `cmapss_alerts`.
+   - **Safety:** OSHA injury types over time from `gold.osha_documents`, by
+     OIICS division and harmonized category. Reuse the
+     `sentinelops.extraction` rules as SQL, or write a small Gold table from
+     them; codes changed in 2024, so never chart raw code prefixes across
+     years. Include DOL attribution. `osha_documents` is already minimized;
+     show no narratives in bulk, and never identify workers or employers.
+2. **Genie space** over a small, curated set of Gold tables, with
+   instructions, sample questions and table/column comments. Check the
+   current API or bundle support for Genie spaces.
+3. Record the warehouse minutes used and JSON or screenshot evidence under
+   `docs/`.
 
-**What exists** (reuse, don't rebuild):
-- C-MAPSS: job `cmapss_retrain` runs ingest → verify → train (only when Gold
-  training digests change; `force_retrain` overrides) → promote (an undecided
-  `@challenger` only) → score → monitor → alerts. Alert checks are logged to
-  `gold.cmapss_alerts`, and a breach fails the run. See `docs/OPERATIONS.md`
-  and `docs/cmapss-retrain.json`.
-- GenAI: `sentinelops.answers` / `answer_eval` (job `osha_answer_eval`) and
-  `sentinelops.extraction` (job `osha_extraction_eval`, outputs in
-  `gold.osha_extractions`). Before any assistant deployment, run a larger
-  answer evaluation with more in-domain unanswerable questions near the 0.6511
-  threshold.
+### 2. Real-time serving demo
+
+- Serve `@champion` (v3) from Model Serving with **scale-to-zero**, as a
+  bounded demo. Delete the endpoint afterwards and confirm in the inventory.
+- **Input contract:** Gold-format feature rows computed by Spark, never
+  pandas-recomputed features (a ~1e-12 difference moves gradient-boosting
+  results). `docs/OPERATIONS.md` ("Serving") describes the options.
+- **Proof:** endpoint predictions for fleet rows must equal the batch
+  predictions in `gold.cmapss_predictions` for v3, bit-for-bit or within a
+  stated tolerance. Consider inference tables only if the cost is clear.
+
+### 3. Answer evaluation at scale, then deployment
+
+- Before any deployment, extend `sentinelops.answer_eval` with more held-out
+  questions, especially in-domain unanswerable ones near the 0.6511 threshold
+  (it caught 5 of 11 such questions, one by only 0.0016).
+- Keep the dev/held-out discipline: tune only on DEV, and run EVAL once, in
+  the job.
+- Agent Framework deployment and review app: check serving cost first,
+  scale-to-zero only, and get the user's approval. Consider Unity Catalog trace
+  storage only if a SQL warehouse is acceptable.
+
+### 4–5. New sources
+
+- **REST API ingestion:**
+  - Choose a keyless public API with a clear license, or put keys in a
+    secret scope or Key Vault (never in the repo).
+  - Land raw JSON immutably in the landing volume, then Auto Loader into
+    Bronze/Silver/Gold, like the existing pipelines.
+- **Event Hubs:** a bounded demo only.
+  - Create the namespace (Standard is needed for the Kafka endpoint).
+  - Stream into Bronze with Structured Streaming using `availableNow`, then
+    delete the namespace the same day.
+  - Credentials go in a secret scope.
+
+### 6. Environments and CI/CD
+
+- Add staging/prod bundle targets with separate catalogs, service principals
+  and `run_as`.
+- GitHub needs the user's choice of repository and visibility. The CI
+  workflow (`.github/workflows/ci.yml`) has never run, and OIDC federation is
+  needed for deployments.
+- Grants and principals change permissions, so ask first.
+
+### 7–8. Optional depth and the write-up
+
+- FD002–FD004 need condition-aware features; the keys and `--subset` already
+  support them.
+- Never tune on the official test labels; promotion stays validation-gated.
+- The demo script follows `SentinelOps.md` ("Demo script"). Use the evidence
+  files under `docs/`, and state the honest caveats recorded in STATUS and
+  SAFETY_RAG.
+
+### What exists (reuse, don't rebuild)
+
+- **C-MAPSS:**
+  - `cmapss_retrain` runs ingest → verify → train (only when Gold training
+    digests change; `force_retrain` overrides) → promote (an undecided
+    `@challenger` only) → score → monitor → alerts. Alert checks are logged to
+    `gold.cmapss_alerts`. See `docs/OPERATIONS.md` and
+    `docs/cmapss-retrain.json`.
+  - `verify` asserts the benchmark's exact counts, so genuinely new data needs
+    growth rules there.
+- **GenAI:**
+  - `sentinelops.answers` / `answer_eval` (job `osha_answer_eval`): the traced
+    `Assistant`, `ChatClient` (REST with visible retries and structured
+    output), and `evaluate_assistant` (`mlflow.genai.evaluate` with code
+    scorers and Llama 3.3 judges).
+  - `sentinelops.extraction` (job `osha_extraction_eval`, outputs in
+    `gold.osha_extractions`): harmonized OIICS truth, the JSON-schema prompt,
+    validation and scoring.
 
 ## 4. Lessons already paid for — don't relearn them
 
@@ -221,9 +310,9 @@ development mode off.
   numpy 2.5.3, pandas 2.3.3, scikit-learn 1.9.1, MLflow 3.16.1, skops 0.15.0,
   databricks-sdk 0.140.0. Keep local and cloud versions consistent.
 - Git: branch `main`, author Cheng Huang <cheng.huang.ca@outlook.com>
-  (repo-local config), 9 commits, no remote. The latest commit is the
-  orchestrated-retraining milestone. The CI workflow in
-  `.github/workflows/ci.yml` has never run.
+  (repo-local config), no remote. The latest milestone commit is
+  `5361947` (orchestrated retraining), followed by this handover rewrite. The
+  CI workflow in `.github/workflows/ci.yml` has never run.
 
 ## 7. Working agreement that has served well
 
@@ -232,6 +321,12 @@ development mode off.
   diagnostics before long jobs.
 - Record evidence (run IDs, JSON under `docs/`), including mistakes and label
   limitations.
+- For anything judged by a model or a label set, keep a dev set for tuning
+  and a held-out set that is run once. Fix the answer key before blaming the
+  model. This found OSHA's 2024 code change, a reversed title, and judge
+  literalism.
+- Watch cloud runs with a background monitor that reports each task's state,
+  and read task outputs (the last JSON line each job prints) for evidence.
 - End every milestone with:
   - tests;
   - `bundle validate --strict`;
