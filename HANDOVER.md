@@ -1,8 +1,25 @@
 # SentinelOps — instructions for the next session
 
-Last updated: September 23, 2026 (Safety GenAI data foundation).
+Last updated: September 24, 2026 (Safety GenAI embeddings).
 
-## Latest continuation — Safety GenAI data foundation
+## Latest continuation — Safety GenAI embeddings
+
+- Job `osha_embed` `379147303783128` (manual) uses `ai_query` to embed new or
+  changed `gold.osha_documents` into `gold.osha_embeddings`, with the Qwen3
+  0.6B pay-per-token endpoint, 1,024 dimensions, unit length, primary key
+  `(report_id, model)`. All **105,993** are embedded; a rerun is a no-op.
+- Direct REST calls to the embedding endpoint are throttled to ~24 inputs/s
+  (limit counted per input). Use `ai_query` for bulk work, and the paced client
+  in `sentinelops.embeddings` only for single query embeddings. The SDK's
+  `api_client.do` hides 429s behind ~5 minutes of retries.
+- Don't judge job progress from UC table properties; they didn't reflect
+  merges. I cancelled a healthy run because of that (see STATUS).
+- Two diagnostic scripts remain in the workspace folder
+  `/Workspace/Users/cheng.huang.ca@outlook.com/sentinelops-scratch`; they are
+  safe to delete.
+- Next: exact retrieval and its evaluation (docs/SAFETY_RAG.md "Next steps").
+
+## Earlier continuation — Safety GenAI data foundation
 
 Read `docs/SAFETY_RAG.md` and the STATUS current milestone.
 - The user approved downloading OSHA's `January2015toNovember2025.zip` (pinned
@@ -121,7 +138,7 @@ the normal approval mechanism; do not bypass controls or expose tokens.
 | MLflow run ID | `d4cb1f49d8444811999bbaa4dcccbfc0` |
 | Registered model | `sentinelops_dev.sentinelops_dev.turbofan_rul` |
 | Bootstrap model version | **2**, **READY**, no alias (was challenger) |
-| OSHA pipeline / job | `osha_safety` `7d53a0fb-d724-4628-a854-23dc1d0e283a` / `osha_ingest` `1070808576153729` |
+| OSHA pipeline / jobs | `osha_safety` `7d53a0fb-d724-4628-a854-23dc1d0e283a` / `osha_ingest` `1070808576153729`, `osha_embed` `379147303783128` |
 | Gold-trained version / alias | **3**, **READY**, **champion** (trained by `cmapss_train` run `174998841420766`; promoted by `cmapss_promote` run `268300947742291`) |
 
 The external location points to

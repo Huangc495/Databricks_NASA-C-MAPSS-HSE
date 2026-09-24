@@ -31,3 +31,34 @@ resources:
           pipeline_task:
             pipeline_id: ${resources.pipelines.osha_safety.id}
             full_refresh: false
+    # Manual only. Incrementally embeds new or changed Gold documents with ai_query
+    # (~470 docs/s measured; direct REST calls are throttled to ~24 inputs/s).
+    osha_embed:
+      name: sentinelops-osha-embed
+      max_concurrent_runs: 1
+      timeout_seconds: 1800
+      performance_target: STANDARD
+      tasks:
+        - task_key: embed
+          max_retries: 0
+          timeout_seconds: 1800
+          spark_python_task:
+            python_file: ../jobs/embed_osha.py
+            parameters:
+              - --catalog
+              - ${var.catalog}
+              - --endpoint
+              - databricks-qwen3-embedding-0-6b
+              - --partitions
+              - '16'
+              - --job-run-id
+              - '{{job.run_id}}'
+              - --source-root
+              - ${workspace.file_path}/src
+          environment_key: embed
+      environments:
+        - environment_key: embed
+          spec:
+            environment_version: '4'
+            dependencies:
+              - numpy==2.5.3

@@ -1,8 +1,35 @@
 # Build status
 
-Last verified: September 23, 2026.
+Last verified: September 24, 2026.
 
-## Current milestone: Safety GenAI data foundation (OSHA)
+## Current milestone: Safety GenAI embeddings (OSHA)
+
+All 105,993 Gold OSHA documents now have embeddings for exact retrieval. No
+answers are generated yet. Details: [SAFETY_RAG.md](SAFETY_RAG.md#embedding-job-osha_embed).
+
+- **Job `osha_embed`** (`379147303783128`) uses `ai_query` against the
+  pay-per-token `databricks-qwen3-embedding-0-6b` endpoint. Results are staged
+  once, and only validated vectors are merged. Run `942266880002897`
+  **SUCCESS**: 81,417 embedded, 0 failed, 3.9 min of execution. `gold.osha_embeddings`
+  stores **105,993** vectors, equal to the Gold document count, with 0 stale
+  and 0 wrong-size. Rerun `206063629553445` **SUCCESS**: 0 pending, no model
+  calls. Evidence: [osha-embedding-backfill.json](osha-embedding-backfill.json).
+- **Measured:** direct REST calls to the endpoint are throttled by input count
+  (16 per request accepted, 32 rejected; ~24–33 inputs/s), far below the
+  published hourly limit. `ai_query` ran at ~470 docs/s without errors.
+  Stored 1,024-dimension vectors can be truncated to 256 exactly.
+- **Mistake, and its cost:** the first attempt used paced REST calls (run
+  `501653035205112`). I cancelled it after 25 minutes because UC table
+  metadata showed no commits, but it was in fact progressing (24,576 rows
+  stored, kept). That cost ~25 minutes of compute. Lesson: count rows or log
+  progress instead. Two one-minute diagnostic runs found the real behavior and
+  led to `ai_query`.
+- Cost (September 24): ~40 min of serverless and ~9–10M embedding tokens
+  (~CAD 0.27), on top of the fixed ~CAD 1.7/day. Nothing is running afterwards.
+- Tests: 29 pass (five new, for batching, pacing, throttling, isolation and
+  validation).
+
+## Earlier milestone: Safety GenAI data foundation (OSHA)
 
 Source, license, privacy and cost checks are done. Minimized OSHA reports are
 in Bronze/Silver/Gold. No embeddings or model calls yet. Design:
@@ -250,9 +277,10 @@ completion of the full SentinelOps platform.
 2. Extend beyond FD001 (FD002–FD004 need operating-condition handling); the
    `(dataset, subset, split, unit, cycle)` keys and `--subset` parameter support it.
 3. Continue the OSHA safety assistant; data, privacy and cost design are done.
-   Next: the embedding job (Qwen3 via `ai_query`), exact retrieval, and a
-   retrieval evaluation set; then grounded answers with citations, abstention
-   and tracing, an LLM-judge evaluation, and structured extraction.
+   Embeddings are done (105,993). Next: exact retrieval with an evaluation set
+   built from OSHA codes (1,024 vs 256 dimensions); then grounded answers with
+   citations, abstention and tracing, an LLM-judge evaluation, and structured
+   extraction.
 4. Add Event Hubs/API ingestion, dashboard/Genie, staging/production and OIDC CI/CD.
 
 ## Cost and runtime controls

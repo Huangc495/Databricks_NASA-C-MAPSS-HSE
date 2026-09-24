@@ -74,7 +74,7 @@ bootstrap cloud model matches the local benchmark and is registered as version 2
 
 The production-shaped path is Auto Loader/Lakeflow ingestion into keyed
 Bronze/Silver/Gold tables, then `cmapss_train`, which trains from Gold and logs
-table lineage. Its version 3 now holds the `challenger` alias: test RMSE
+table lineage. Its version 3 passed the validation gate and is `@champion`: test RMSE
 **18.34**, MAE **13.17**, NASA **650.81**. The small gap from v2 comes from a
 floating-point difference, below 4e-12, between Spark and pandas rolling means;
 it was reproduced exactly offline. See the [ingestion runbook](docs/INGESTION.md)
@@ -92,8 +92,9 @@ this timeout reduces exposure but is not a hard billing cap.
    age-matched drift monitoring. See [docs/OPERATIONS.md](docs/OPERATIONS.md).
 2. Extend training beyond FD001 using the existing composite keys.
 3. Safety assistant over OSHA Severe Injury Reports. Done: provenance, a
-   privacy-minimized landing, and the `osha_safety` pipeline to Gold (105,993
-   documents). Next: embeddings, exact retrieval, cited answers and evaluation.
+   privacy-minimized landing, the `osha_safety` pipeline to Gold (105,993
+   documents), and Qwen3 embeddings for all of them via `ai_query`. Next: exact
+   retrieval, cited answers and evaluation.
    See [docs/SAFETY_RAG.md](docs/SAFETY_RAG.md). Data courtesy of the U.S.
    Department of Labor (OSHA); no endorsement implied.
 4. Add Event Hubs/API sources, dashboard/Genie and OIDC staging/production CI/CD.

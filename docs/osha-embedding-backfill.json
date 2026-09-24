@@ -1,0 +1,30 @@
+{
+  "job_id": 379147303783128,
+  "run_id": 942266880002897,
+  "result": "SUCCESS",
+  "pending": 81417,
+  "embedded": 81417,
+  "failed": 0,
+  "characters": 31637224,
+  "sample_error": null,
+  "merge": {
+    "num_affected_rows": 81417,
+    "num_updated_rows": 0,
+    "num_deleted_rows": 0,
+    "num_inserted_rows": 81417
+  },
+  "deleted": {
+    "num_affected_rows": 0
+  },
+  "model": "databricks-qwen3-embedding-0-6b",
+  "dimensions": 1024,
+  "documents": 105993,
+  "stored": 105993,
+  "stale_or_orphaned": 0,
+  "wrong_size": 0,
+  "by_run": {
+    "942266880002897": 81417,
+    "501653035205112": 24576
+  },
+  "seconds": 210.0
+}

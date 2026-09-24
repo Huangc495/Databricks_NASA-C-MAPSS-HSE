@@ -66,7 +66,7 @@ CAD; DBU rates from the Databricks pricing pages).
 | Option | Cost |
 |---|---|
 | Vector Search Standard endpoint: 4 DBU/h × CAD 0.097 | ~CAD 9.3/day. It bills once an index exists and for 24 h after the last index is deleted. |
-| Embeddings with Qwen3 Embedding 0.6B: 0.286 DBU per 1M tokens | ~CAD 0.03 per 1M tokens; the corpus is ~4.8M tokens, ~CAD 0.15 |
+| Embeddings with Qwen3 Embedding 0.6B: 0.286 DBU per 1M tokens | ~CAD 0.03 per 1M tokens. The narratives are ~4.8M tokens; with headers the documents are ~9–10M tokens, ~CAD 0.27. |
 | GTE Large: 1.857 DBU per 1M tokens | ~CAD 0.18 per 1M tokens |
 | GPT-OSS-120B: 2.143 / 8.571 DBU per 1M tokens (in/out) | ~CAD 0.21 / 0.83 per 1M |
 | Llama 3.3 70B: 7.143 / 21.429 DBU per 1M tokens (in/out) | ~CAD 0.69 / 2.08 per 1M |
@@ -75,9 +75,9 @@ With the always-on ~CAD 1.7/day workspace networking, any day with a Vector
 Search endpoint exceeds the $10/day budget. The user chose exact search:
 
 - Embed Gold documents with the pay-per-token `databricks-qwen3-embedding-0-6b`
-  endpoint via `ai_query` (with `failOnError => false`) in a serverless job.
-  Rows are keyed by `(report_id, document_sha256, model)`, so reruns only embed
-  new or changed text.
+  endpoint through `ai_query` in a serverless job (see "Embedding job" below).
+  Rows are keyed by `(report_id, model)` and carry the document hash, so reruns
+  only embed new or changed text.
 - Store the vectors in Delta. Retrieval is exact cosine top-k over about 106k
   normalized vectors. That's exact rather than approximate, and costs nothing
   when idle.
@@ -85,11 +85,53 @@ Search endpoint exceeds the $10/day budget. The user chose exact search:
   `gold.osha_documents` with triggered sync. It becomes worthwhile when the
   corpus or query volume grows, or when the budget allows a CAD 9+/day endpoint.
 
+## Embedding job (`osha_embed`)
+
+**Result (September 24, 2026):** all **105,993** Gold documents have unit-length
+1,024-dimension Qwen3 embeddings in `gold.osha_embeddings`, with primary key
+`(report_id, model)`. There are 0 failures, 0 stale rows and 0 wrong-size
+vectors. A rerun sent nothing to the model. Evidence:
+[osha-embedding-backfill.json](osha-embedding-backfill.json).
+
+How it works: `jobs/embed_osha.py` selects Gold documents whose
+`(report_id, document_sha256)` isn't stored yet. It calls
+`ai_query(endpoint, document, failOnError => false)` over 16 partitions and
+writes the results **once** to a staging table, so a second read never
+repeats paid calls. It merges only valid vectors (no error, 1,024 values,
+|norm − 1| < 1e-3), drops the staging table, and deletes vectors for reports
+no longer in Gold.
+
+What was measured before and during the build:
+
+- The endpoint returns 1,024-dimension unit vectors. `dimensions=256` equals
+  the first 256 values rescaled to unit length (max difference 1.5e-8), so
+  retrieval can evaluate 256 dimensions from the stored 1,024.
+- **Direct REST calls are throttled by input count, not tokens,** far below
+  the documented hourly limit. 16 inputs per request are accepted, 32 short
+  inputs are rejected, and ~24–33 inputs/s is sustainable. The SDK's
+  `api_client.do` silently retries 429s for up to 5 minutes, which initially
+  hid this.
+- **`ai_query` is not held to that REST limit:** 5,000 documents in 10.6 s
+  (~470/s) with no errors; the 81,417-document backfill took 3.9 minutes of
+  execution. The paced REST client in `sentinelops.embeddings` is kept for
+  embedding single questions at query time.
+- The first backfill attempt used paced REST calls (run `501653035205112`).
+  After 18 minutes, UC table metadata still showed no commits, so I cancelled
+  it as stalled. Row counts later showed it had stored 24,576 embeddings at the
+  expected ~24/s. **Table metadata properties are not a progress signal**;
+  count rows or log per-chunk progress. Those 24,576 rows were kept (the job
+  is incremental). Batched REST and single-request vectors differ by at most
+  0.002 (cosine 0.9999), which is negligible for ranking;
+  `embedding_job_run` records each row's origin.
+- Cost: ~9–10M tokens × 0.286 DBU per 1M × CAD 0.097 ≈ CAD 0.27, plus ~40
+  minutes of serverless (including the cancelled run and two one-minute
+  diagnostics).
+
 ## Next steps
 
-1. Embedding job, retrieval module, and a small labelled retrieval evaluation
-   set built from OSHA's own classification codes (for example, "amputation
-   incidents involving presses").
+1. Retrieval module and a small labelled retrieval evaluation set built from
+   OSHA's own classification codes (for example, "amputation incidents
+   involving presses"), comparing 1,024 and 256 dimensions.
 2. Grounded answers from GPT-OSS-120B with inline `[report_id]` citations, an
    abstention rule, and MLflow tracing.
 3. Evaluation: correctness, groundedness and relevance using an LLM judge from
