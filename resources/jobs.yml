@@ -8,6 +8,7 @@ resources:
       tasks:
         - task_key: train_and_score
           max_retries: 0
+          disable_auto_optimization: true
           spark_python_task:
             python_file: ../jobs/fd001.py
             parameters:
@@ -37,6 +38,7 @@ resources:
       tasks:
         - task_key: train_from_gold
           max_retries: 0
+          disable_auto_optimization: true
           timeout_seconds: 900
           spark_python_task:
             python_file: ../jobs/train_medallion.py
@@ -64,6 +66,7 @@ resources:
       tasks:
         - task_key: promote
           max_retries: 0
+          disable_auto_optimization: true
           timeout_seconds: 600
           spark_python_task:
             python_file: ../jobs/promote.py
@@ -92,6 +95,7 @@ resources:
       tasks:
         - task_key: score
           max_retries: 0
+          disable_auto_optimization: true
           timeout_seconds: 600
           spark_python_task:
             python_file: ../jobs/score_fleet.py
@@ -113,6 +117,7 @@ resources:
           depends_on:
             - task_key: score
           max_retries: 0
+          disable_auto_optimization: true
           timeout_seconds: 600
           spark_python_task:
             python_file: ../jobs/monitor_fleet.py
@@ -123,6 +128,164 @@ resources:
               - FD001
               - --fleet-split
               - test
+              - --job-run-id
+              - '{{job.run_id}}'
+              - --source-root
+              - ${workspace.file_path}/src
+          environment_key: ml
+      environments:
+        - environment_key: ml
+          spec: *ml_environment
+    # Manual only. The orchestrated path: ingest -> verify -> train -> promote -> score ->
+    # monitor -> alerts, as one job so nothing reads Gold while an ingestion update writes it.
+    # train runs only when the Gold training inputs differ from the champion's (or with
+    # force_retrain=true); promote evaluates only an undecided @challenger. alerts fails the run
+    # when a monitoring threshold is breached.
+    cmapss_retrain:
+      name: sentinelops-cmapss-retrain
+      max_concurrent_runs: 1
+      timeout_seconds: 5400
+      performance_target: STANDARD
+      parameters:
+        - name: force_retrain
+          default: 'false'
+        - name: max_rmse_increase
+          default: '0.2'
+        - name: max_psi
+          default: '0.2'
+        - name: max_snapshot_age_hours
+          default: '24'
+      tasks:
+        - task_key: ingest
+          max_retries: 0
+          disable_auto_optimization: true
+          timeout_seconds: 1200
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.cmapss_medallion.id}
+            full_refresh: false
+        - task_key: verify
+          depends_on:
+            - task_key: ingest
+          max_retries: 0
+          disable_auto_optimization: true
+          timeout_seconds: 600
+          spark_python_task:
+            python_file: ../jobs/verify_medallion.py
+            parameters:
+              - --catalog
+              - ${var.catalog}
+              - --schema
+              - ${var.schema}
+              - --source-root
+              - ${workspace.file_path}/src
+          environment_key: ml
+        - task_key: train
+          depends_on:
+            - task_key: verify
+          max_retries: 0
+          disable_auto_optimization: true
+          timeout_seconds: 900
+          spark_python_task:
+            python_file: ../jobs/train_medallion.py
+            parameters:
+              - --catalog
+              - ${var.catalog}
+              - --schema
+              - ${var.schema}
+              - --subset
+              - FD001
+              - --only-if-changed
+              - --force-retrain
+              - '{{job.parameters.force_retrain}}'
+              - --source-root
+              - ${workspace.file_path}/src
+          environment_key: ml
+        - task_key: promote
+          depends_on:
+            - task_key: train
+          max_retries: 0
+          disable_auto_optimization: true
+          timeout_seconds: 600
+          spark_python_task:
+            python_file: ../jobs/promote.py
+            parameters:
+              - --catalog
+              - ${var.catalog}
+              - --schema
+              - ${var.schema}
+              - --max-baseline-ratio
+              - '0.5'
+              - --tolerance
+              - '0.0'
+              - --only-pending
+              - --source-root
+              - ${workspace.file_path}/src
+          environment_key: ml
+        - task_key: score
+          depends_on:
+            - task_key: promote
+          max_retries: 0
+          disable_auto_optimization: true
+          timeout_seconds: 600
+          spark_python_task:
+            python_file: ../jobs/score_fleet.py
+            parameters:
+              - --catalog
+              - ${var.catalog}
+              - --schema
+              - ${var.schema}
+              - --subset
+              - FD001
+              - --fleet-split
+              - test
+              - --job-run-id
+              - '{{job.run_id}}'
+              - --source-root
+              - ${workspace.file_path}/src
+          environment_key: ml
+        - task_key: monitor
+          depends_on:
+            - task_key: score
+          max_retries: 0
+          disable_auto_optimization: true
+          timeout_seconds: 600
+          spark_python_task:
+            python_file: ../jobs/monitor_fleet.py
+            parameters:
+              - --catalog
+              - ${var.catalog}
+              - --subset
+              - FD001
+              - --fleet-split
+              - test
+              - --job-run-id
+              - '{{job.run_id}}'
+              - --source-root
+              - ${workspace.file_path}/src
+          environment_key: ml
+        - task_key: alerts
+          depends_on:
+            - task_key: monitor
+          max_retries: 0
+          disable_auto_optimization: true
+          timeout_seconds: 600
+          spark_python_task:
+            python_file: ../jobs/check_alerts.py
+            parameters:
+              - --catalog
+              - ${var.catalog}
+              - --schema
+              - ${var.schema}
+              - --subset
+              - FD001
+              - --fleet-split
+              - test
+              - --max-rmse-increase
+              - '{{job.parameters.max_rmse_increase}}'
+              - --max-psi
+              - '{{job.parameters.max_psi}}'
+              - --max-snapshot-age-hours
+              - '{{job.parameters.max_snapshot_age_hours}}'
               - --job-run-id
               - '{{job.run_id}}'
               - --source-root

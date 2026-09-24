@@ -22,6 +22,24 @@ class Evidence:
     labels_digest: str | None
 
 
+RETRAIN_INPUTS = ("features", "training_labels")
+
+
+def retrain_decision(current: dict, champion_params: dict | None, force: bool = False) -> tuple[bool, str]:
+    """Retrain only when Gold training inputs differ from what the champion was trained on.
+
+    `current` maps each RETRAIN_INPUTS name to the digest of the rows training would use now;
+    `champion_params` are the champion training run's params (digest_<name>), or None.
+    Retraining unchanged data would register an identical version that the tie rule promotes.
+    """
+    if force:
+        return True, "forced"
+    if champion_params is None:
+        return True, "no champion"
+    changed = [name for name in RETRAIN_INPUTS if champion_params.get(f"digest_{name}") != current[name]]
+    return (True, "changed: " + ", ".join(changed)) if changed else (False, "Gold training inputs unchanged")
+
+
 def constant_baseline_rmse(labels: pd.DataFrame, fit_units, validation_units) -> float:
     """RMSE on validation engines of predicting the fit engines' mean label."""
     fit = labels[labels.unit.isin(fit_units)]

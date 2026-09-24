@@ -1,7 +1,7 @@
 # SentinelOps — handover for the next session
 
-Last updated: September 24, 2026, 07:50 UTC. Git `main` is clean; the
-latest commit is the structured-extraction milestone (see section 6).
+Last updated: September 24, 2026, 09:10 UTC. Git `main` is clean; the
+latest commit is the orchestrated-retraining milestone (see section 6).
 
 **Where things stand.** Both halves of the portfolio project run in Azure
 Databricks.
@@ -10,6 +10,8 @@ Databricks.
   - Auto Loader/Lakeflow ingestion into Bronze/Silver/Gold.
   - Training from Gold, with a validation-gated champion (model version 3).
   - Idempotent fleet batch scoring, with delayed-label and drift monitoring.
+  - One orchestrated job (`cmapss_retrain`) that retrains only when Gold
+    training data changes, followed by threshold alerts.
 - **Safety GenAI assistant** (OSHA Severe Injury Reports):
   - Privacy-minimized ingestion into Gold documents.
   - Qwen3 embeddings for all 105,993 documents.
@@ -21,7 +23,8 @@ Databricks.
   - Structured extraction (event, nature, body part, source) scored against
     harmonized OSHA codes. GPT-OSS-120B matches a supervised TF-IDF model on
     three fields but trails on source (0.760 vs 0.825).
-- **The next task is orchestrated retraining and alerts** (RUL side).
+- **The next task is the AI/BI dashboard and Genie space** (needs SQL
+  warehouse time; ask first).
 
 The authoritative task tracker is the **Task status** table at the top of
 [docs/STATUS.md](docs/STATUS.md). Update it as work lands.
@@ -32,14 +35,14 @@ The authoritative task tracker is the **Task status** table at the top of
    - this file;
    - `docs/STATUS.md` (task table + current milestone);
    - `docs/SAFETY_RAG.md` (design, measurements, retrieval, answer and extraction evaluations);
-   - `docs/OPERATIONS.md` and `docs/INGESTION.md` (needed for the next task);
+   - `docs/OPERATIONS.md` (orchestration and alerts) and `docs/INGESTION.md`;
    - `SentinelOps.md` for the full intended scope.
 2. Verify the environment and that nothing is running (all free):
 
 ```powershell
 . ./scripts/Use-SentinelOps.ps1
 az account show --query '{name:name,id:id,user:user.name}' -o json
-.venv/Scripts/python.exe -m pytest -q                      # expect 64 passed
+.venv/Scripts/python.exe -m pytest -q                      # expect 67 passed
 .tools/databricks/databricks.exe bundle validate --strict -t dev
 .tools/databricks/databricks.exe jobs list-runs --active-only -o json
 .tools/databricks/databricks.exe clusters list -o json
@@ -81,46 +84,40 @@ az rest --method post --url 'https://management.azure.com/subscriptions/b1026367
   endorsement. Never use the assistant to identify individuals or employers.
   Landing files are immutable; don't re-upload the quality probe or OSHA files.
 
-## 3. Next task in detail: orchestrated retraining and alerts
+## 3. Next task in detail: AI/BI dashboard and Genie space
 
-The GenAI side is complete up to deployment, so the recommended order returns
-to the RUL side. Read `docs/OPERATIONS.md` and `docs/INGESTION.md` first.
+**This needs SQL warehouse time; ask the user first.** Check the current
+serverless SQL price for `westus2`, state the cost, and use the existing
+Serverless Starter Warehouse (10-minute auto-stop). Stop it when done, and
+confirm it is `STOPPED` in the inventory.
 
-1. **One manual multi-task job** chaining the existing steps: ingest
-   (pipeline task on `cmapss_medallion`) → verify → train → promote → score →
-   monitor. Use `depends_on`; keep the task code and parameters of the current
-   jobs, and keep those jobs for single-step use. Follow the usual guardrails
-   (STANDARD, one concurrent run, zero retries, task and job timeouts, no
-   schedule); `tests/test_bundle.py` enforces them. Running as one job also
-   prevents concurrent Gold reads during a refresh.
-   - `cmapss_promote` records a rejection as a tag and exits 0; it fails only
-     when no `@challenger` exists. Scoring then continues with the current
-     `@champion`, which is the intended behavior.
-   - A full chain is roughly 40 minutes of serverless (ingest ~12, verify ~6,
-     train ~6.5, promote ~6.4, score/monitor ~9.3), ≈ CAD 0.6. State that
-     before running.
-2. **Alerts without a SQL warehouse.** Add a final task that reads the newest
-   snapshots in `gold.cmapss_model_performance` and `gold.cmapss_feature_drift`
-   and fails when thresholds are breached. Set the thresholds in advance,
-   relative to each model version's first snapshot (for example, endpoint RMSE
-   up more than 20%, or any `psi_age_matched` > 0.2), never from test RMSE.
-   Job email notifications on failure would make it an alert; **ask the user**
-   before configuring notifications or an address. Databricks SQL alerts would
-   need warehouse time while evaluating.
-3. Rehearse locally, then run the chain once end to end. Exercise the alert
-   path with a deliberately impossible threshold in a separate run, and record
-   the evidence under `docs/`.
+1. **Dashboard(s) as bundle resources** (`resources: dashboards:` with a
+   `.lvdash.json`), so they deploy and validate like the jobs. Suggested pages:
+   - **Fleet health:** `gold.cmapss_predictions`,
+     `cmapss_model_performance` snapshots by segment, `cmapss_feature_drift`
+     (raw vs age-matched PSI), `cmapss_alerts`.
+   - **Safety:** OSHA injury types over time from `gold.osha_documents` (by
+     division and harmonized category; reuse the `sentinelops.extraction` rules
+     as SQL, or write a small Gold table from them), with DOL attribution.
+     Privacy: `osha_documents` is already minimized; show no narratives in
+     bulk, and never identify workers or employers.
+2. **Genie space** over a small, curated set of Gold tables, with instructions,
+   sample questions and table comments. Check the current API or bundle
+   support for Genie spaces in the docs.
+3. Record the queries' costs (warehouse minutes) and screenshots or JSON
+   evidence under `docs/`.
 
-**What exists on the GenAI side** (reuse, don't rebuild):
-- `sentinelops.answers` / `answer_eval` and job `osha_answer_eval`: grounded
-  answers, code-checked citations, a calibrated decline rule, MLflow traces,
-  and the held-out evaluation (`docs/osha-answer-eval.json`). Before any
-  deployment, run a larger evaluation with more in-domain unanswerable
-  questions near the 0.6511 threshold.
-- `sentinelops.extraction` and job `osha_extraction_eval`: harmonized OIICS
-  truth (OSHA changed codes in 2024), a JSON-schema prompt (v3), validation and
-  scoring. Raw outputs are in `gold.osha_extractions`; evidence is in
-  `docs/osha-extraction-eval.json`.
+**What exists** (reuse, don't rebuild):
+- C-MAPSS: job `cmapss_retrain` runs ingest → verify → train (only when Gold
+  training digests change; `force_retrain` overrides) → promote (an undecided
+  `@challenger` only) → score → monitor → alerts. Alert checks are logged to
+  `gold.cmapss_alerts`, and a breach fails the run. See `docs/OPERATIONS.md`
+  and `docs/cmapss-retrain.json`.
+- GenAI: `sentinelops.answers` / `answer_eval` (job `osha_answer_eval`) and
+  `sentinelops.extraction` (job `osha_extraction_eval`, outputs in
+  `gold.osha_extractions`). Before any assistant deployment, run a larger
+  answer evaluation with more in-domain unanswerable questions near the 0.6511
+  threshold.
 
 ## 4. Lessons already paid for — don't relearn them
 
@@ -152,6 +149,10 @@ to the RUL side. Read `docs/OPERATIONS.md` and `docs/INGESTION.md` first.
 | Chat endpoints return 429 to parallel REST calls | GPT-OSS rejected 4 concurrent requests; use 2 locally. `ai_query` batched 1,051 extractions with 0 failures |
 | GPT-OSS ignores a rule the schema order undercuts | It named the object tripped over in `source_object`, then categorized it. Put the rule inside the field the model writes first |
 | GPT-OSS-20B returns empty content | At medium effort it can spend all `max_tokens` on reasoning (1.1% of test rows). Count these as invalid; prefer 120B |
+| Serverless tasks retried despite `max_retries: 0` | Serverless auto-optimization retries failed tasks by default. Every task sets `disable_auto_optimization: true`; `tests/test_bundle.py` enforces it |
+| If/else conditions need task values | `dbutils.jobs.taskValues.set` works only in notebooks, whose environment differs from the pinned one. `cmapss_retrain` uses self-deciding steps (`--only-if-changed`, `--only-pending`) instead |
+| Running one task of a job | `jobs run-now --json @file` with `"only": ["task"]` and `job_parameters`; other tasks show `DISABLED`, and a failure reads `INTERNAL_ERROR`/`FAILED` |
+| Inline Python in PowerShell 5.1 loses its double quotes | Put the Python in a file and run it; write JSON request bodies to a file and pass `@file` |
 
 ## 5. Resources
 
@@ -178,9 +179,10 @@ with the CLI (`infra/uc-*.json`). Bundle `sentinelops`, target `dev`.
 | job `osha_ingest` / `osha_embed` / `osha_retrieval_eval` | `1070808576153729` / `379147303783128` / `383639217735446` | Ingest / embed / evaluate retrieval |
 | job `osha_answer_eval` | `1029765841933443` | Grounded answers on held-out questions + Llama 3.3 judges (run `745084593826476`) |
 | job `osha_extraction_eval` | `804198192778755` | Structured extraction vs OSHA codes and baselines (run `570236144351626`) |
+| job `cmapss_retrain` | `1037945637149770` | Orchestrated ingest → … → alerts (run `599725542930474`; breach test `955572570273055`) |
 
-All jobs are manual, STANDARD, one concurrent run, zero retries, with
-timeouts and no schedules. Pipelines are triggered serverless with
+All jobs are manual, STANDARD, one concurrent run, zero retries (including
+serverless auto-optimization retries), with timeouts and no schedules. Pipelines are triggered serverless with
 development mode off.
 
 - Model: `sentinelops_dev.sentinelops_dev.turbofan_rul` — **v3 `@champion`**
@@ -199,7 +201,7 @@ development mode off.
 - Tables:
   - `bronze.{cmapss_lines, cmapss_labels, osha_sir_reports}`
   - `silver.{cmapss_observations, cmapss_quarantine, cmapss_conflicts, cmapss_endpoint_labels, osha_incidents, osha_quarantine}`
-  - `gold.{cmapss_features, cmapss_training_labels, cmapss_test_endpoints, cmapss_predictions, cmapss_model_performance, cmapss_feature_drift, osha_documents, osha_embeddings, osha_extractions}`
+  - `gold.{cmapss_features, cmapss_training_labels, cmapss_test_endpoints, cmapss_predictions, cmapss_model_performance, cmapss_feature_drift, cmapss_alerts, osha_documents, osha_embeddings, osha_extractions}`
   - bootstrap `sentinelops_dev.{silver_fd001_train, gold_fd001_features, gold_fd001_predictions}`
 
 ## 6. Local workspace and tools
@@ -219,8 +221,8 @@ development mode off.
   numpy 2.5.3, pandas 2.3.3, scikit-learn 1.9.1, MLflow 3.16.1, skops 0.15.0,
   databricks-sdk 0.140.0. Keep local and cloud versions consistent.
 - Git: branch `main`, author Cheng Huang <cheng.huang.ca@outlook.com>
-  (repo-local config), 8 commits, no remote. The latest commit is the
-  structured-extraction milestone. The CI workflow in
+  (repo-local config), 9 commits, no remote. The latest commit is the
+  orchestrated-retraining milestone. The CI workflow in
   `.github/workflows/ci.yml` has never run.
 
 ## 7. Working agreement that has served well

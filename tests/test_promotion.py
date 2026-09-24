@@ -4,7 +4,7 @@ import pandas as pd
 import pytest
 from sentinelops.medallion import digest, label_frame, training_frame
 from sentinelops.model import FEATURES
-from sentinelops.promotion import Evidence, constant_baseline_rmse, decide
+from sentinelops.promotion import Evidence, constant_baseline_rmse, decide, retrain_decision
 from test_medallion import gold, trajectories
 
 CHALLENGER = Evidence(version=3, subset="FD001", training_source="gold_medallion", input_columns=tuple(FEATURES),
@@ -42,3 +42,13 @@ def test_label_frame_digest_matches_training_digest():
     train = training_frame(x, y, "FD001")
     columns = ["unit", "cycle", "rul"]
     assert digest(label_frame(y, "FD001")[columns]) == digest(train[columns])
+
+
+def test_retraining_happens_only_when_gold_training_inputs_change():
+    current = {"features": "f1", "training_labels": "l1", "test_endpoints": "t1"}
+    champion = {"digest_features": "f1", "digest_training_labels": "l1", "digest_test_endpoints": "t0"}
+    assert retrain_decision(current, champion) == (False, "Gold training inputs unchanged")  # Test labels don't count.
+    assert retrain_decision(current, {**champion, "digest_training_labels": "l0"}) == (True, "changed: training_labels")
+    assert retrain_decision(current, {}) == (True, "changed: features, training_labels")
+    assert retrain_decision(current, None) == (True, "no champion")
+    assert retrain_decision(current, champion, force=True) == (True, "forced")

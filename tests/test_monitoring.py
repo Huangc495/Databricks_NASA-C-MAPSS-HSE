@@ -1,7 +1,7 @@
 import numpy as np
 import pandas as pd
 import pytest
-from sentinelops.monitoring import drift, performance, psi
+from sentinelops.monitoring import alert_checks, drift, performance, psi
 
 
 def test_performance_segments_and_bias_per_model_version():
@@ -46,3 +46,23 @@ def test_age_matching_removes_a_pure_lifecycle_shift():
     assert result.psi > 0.5 and result.psi_age_matched < 0.02
     with pytest.raises(ValueError, match="outside"):
         drift(young, old, ["wear"])
+
+
+def test_alert_checks_compare_with_the_first_snapshot_and_flag_drift_and_staleness():
+    t0, t1 = pd.Timestamp("2026-09-24 08:00"), pd.Timestamp("2026-09-25 08:00")
+    perf = pd.DataFrame({"segment": ["endpoint", "actual_le_125", "endpoint", "actual_le_125"],
+                         "rmse": [18.0, 19.0, 18.0, 23.0], "computed_at": [t0, t0, t1, t1]})
+    snapshots = pd.DataFrame({"feature": ["s2", "s3", "s2", "s3"], "psi_age_matched": [0.5, 0.1, 0.05, 0.3],
+                              "computed_at": [t0, t0, t1, t1]})
+    checks = alert_checks(perf, snapshots, now=pd.Timestamp("2026-09-25 09:00"), max_rmse_increase=0.2, max_psi=0.2,
+                          max_age_hours=24).set_index(["check", "subject"])
+    assert checks.loc[("rmse_increase", "endpoint"), "value"] == pytest.approx(0.0)
+    assert checks.loc[("rmse_increase", "actual_le_125"), "breached"]  # 23 / 19 - 1 = 0.21 > 0.2
+    # Only the latest drift snapshot counts: s2 recovered, s3 drifted.
+    assert not checks.loc[("psi_age_matched", "s2"), "breached"] and checks.loc[("psi_age_matched", "s3"), "breached"]
+    assert not checks.loc[("snapshot_age_hours", "performance"), "breached"]
+    stale = alert_checks(perf, snapshots, now=pd.Timestamp("2026-09-26 14:00"), max_rmse_increase=1, max_psi=1,
+                         max_age_hours=24)
+    assert stale[stale.breached].check.tolist() == ["snapshot_age_hours", "snapshot_age_hours"]
+    missing = alert_checks(perf.iloc[:0], snapshots.iloc[:0], now=t1, max_rmse_increase=1, max_psi=1, max_age_hours=24)
+    assert missing.breached.all() and len(missing) == 4  # No snapshots at all is itself an alert.

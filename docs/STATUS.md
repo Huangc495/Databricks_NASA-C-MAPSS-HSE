@@ -1,6 +1,6 @@
 # Build status
 
-Last verified: September 24, 2026 (structured extraction).
+Last verified: September 24, 2026 (orchestrated retraining and alerts).
 
 ## Task status
 
@@ -14,7 +14,7 @@ cost or prerequisites, with the reason given.
 | Task | Status | Evidence or next action |
 |---|---|---|
 | Azure foundation: ADLS Gen2, workspace, access connector, UC catalog | Done | `infra/main.bicep`; "Azure" section below |
-| Bundle deployment (dev target, strict validation, manual jobs) | Done | `databricks.yml`, `resources/*.yml`; 11 jobs and 2 pipelines deployed; a test enforces job guardrails |
+| Bundle deployment (dev target, strict validation, manual jobs) | Done | `databricks.yml`, `resources/*.yml`; 12 jobs and 2 pipelines deployed; a test enforces job guardrails, including no serverless auto-retries |
 | Cost visibility: meter-level Azure cost query | Done | Found an always-on NAT gateway/IP, ~CAD 1.7/day ("Cost and runtime controls") |
 | Azure budget alert | Not started | Cheap safeguard for the $10/day limit; needs your approval to create |
 | Databricks billing tables (`system.billing`) access | Not started | Needs an account/metastore admin grant |
@@ -40,8 +40,8 @@ cost or prerequisites, with the reason given.
 | Validation-gated promotion (never reads test labels) | Done | v3 is `@champion`; `promotion-decision.json` |
 | Fleet batch scoring into an idempotent inference log | Done | `gold.cmapss_predictions`; `fleet-scoring-*.json` |
 | Delayed-label performance and age-matched drift monitoring | Done | `gold.cmapss_model_performance`, `gold.cmapss_feature_drift` |
-| Alerts on drift and performance tables | Not started | Needs thresholds, and a SQL warehouse only while an alert evaluates |
-| Orchestrated retraining (ingest → verify → train → promote → score) | **Next** | Also prevents concurrent Gold reads |
+| Alerts on drift and performance tables | Done | Task `alerts` in `cmapss_retrain`: relative RMSE, age-matched PSI and freshness thresholds, logged to `gold.cmapss_alerts`; a breach fails the run (breach test run `955572570273055`). No email notification (your choice) |
+| Orchestrated retraining (ingest → verify → train → promote → score) | Done | Job `cmapss_retrain`; retrains only when the Gold training digests differ from the champion's. Unchanged-data run `599725542930474` SUCCESS in 23 min; `cmapss-retrain.json` |
 | Real-time serving demo with Gold-format features | Not started | Bounded demo; delete the endpoint afterwards |
 | Hyperparameter tuning, `mlflow.evaluate`, sequence baseline | Not started | |
 | Lakehouse Monitoring inference profile | Not started (optional) | Job-computed metrics already cover the demo |
@@ -65,17 +65,58 @@ cost or prerequisites, with the reason given.
 
 | Task | Status | Evidence or next action |
 |---|---|---|
-| Unit tests (64) and local CI workflow file | Done (local) | `.github/workflows/ci.yml` has never run: no remote |
+| Unit tests (67) and local CI workflow file | Done (local) | `.github/workflows/ci.yml` has never run: no remote |
 | Git history | Done (local) | Branch `main`; no remote |
 | GitHub repository, CI runs, OIDC deployment to staging/prod | Not started | Needs your choice of repository and visibility |
-| AI/BI dashboard and Genie space | Not started | Viewing uses SQL warehouse time |
+| AI/BI dashboard and Genie space | **Next** | Viewing uses SQL warehouse time: needs your go-ahead on warehouse use |
 | Demo script and portfolio write-up | Not started | Last |
 
-Recommended order: orchestrated retraining and alerts → dashboard/Genie → serving
-demo → API/streaming sources → environments and CI/CD. A larger answer
-evaluation comes before any assistant deployment.
+Recommended order: dashboard/Genie → serving demo → API/streaming sources →
+environments and CI/CD. A larger answer evaluation comes before any assistant
+deployment.
 
-## Current milestone: Safety GenAI structured extraction (OSHA)
+## Current milestone: orchestrated retraining and alerts (C-MAPSS)
+
+One manual job, `cmapss_retrain` (`1037945637149770`), now runs the whole loop:
+ingest → verify → train → promote → score → monitor → alerts. Details:
+[OPERATIONS.md](OPERATIONS.md#orchestrated-retraining-cmapss_retrain).
+
+- **Retrain only on change.** `train --only-if-changed` compares the Gold
+  training digests with the `@champion` run's digests. Retraining unchanged
+  data would register an identical version, which the tie rule promotes. The
+  `force_retrain` job parameter overrides this. `promote --only-pending`
+  evaluates only an undecided `@challenger`.
+- **A linear chain, not an If/else task.** Task values can only be set from
+  notebooks, and a notebook's different environment could change the digests.
+- **Unchanged-data run `599725542930474`: SUCCESS in 23.3 min.**
+  - The ingest update appended 0 rows, and every flow was `NO_OP`.
+  - `verify` passed.
+  - `train` recomputed v3's digests exactly and skipped.
+  - `promote` found no challenger, and `score` had 0 pending rows.
+  - `monitor` reproduced endpoint RMSE 18.3415 bit-for-bit.
+  - `alerts` ran 47 checks with 0 breaches.
+  - After `verify`, the tasks reused warm compute (about 0.5 min each).
+- **Alerts:**
+  - Thresholds: RMSE +20% vs the version's first snapshot, age-matched PSI
+    0.2, and snapshots under 24 h old.
+  - Every check is appended to `gold.cmapss_alerts`, and a breach fails the
+    run.
+  - Breach test (alerts only, `max_psi=0.05`): 20 breaches, the task failed,
+    one attempt.
+  - No email notifications (your choice), and no SQL warehouse.
+- **Found and fixed:** serverless auto-optimization had retried a failed task
+  despite `max_retries: 0`, so the zero-retry guardrail was not fully in
+  effect. All 19 tasks in all 12 jobs now set `disable_auto_optimization:
+  true`, and a test enforces it.
+- **Not run:** the retrain branch (your choice, to avoid an identical v4).
+  `verify` asserts the benchmark's exact counts, so genuinely new data would
+  need growth rules there.
+- Cost: about 40 min of serverless in total (≈ CAD 0.65); no model calls.
+  Champion is still v3, and nothing is running afterwards.
+- Tests: 67 pass (3 new: retrain decision, alert checks, chain wiring;
+  guardrail test extended).
+
+## Earlier milestone: Safety GenAI structured extraction (OSHA)
 
 LLMs now code OSHA narratives into event, nature of injury, body part and
 source. The results are scored against OSHA's own coding, next to a majority

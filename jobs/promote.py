@@ -14,6 +14,8 @@ parser.add_argument("--catalog", required=True)
 parser.add_argument("--schema", required=True)
 parser.add_argument("--max-baseline-ratio", type=float, required=True)
 parser.add_argument("--tolerance", type=float, required=True)
+# Orchestrated runs: exit cleanly when there is no undecided @challenger to evaluate.
+parser.add_argument("--only-pending", action="store_true")
 parser.add_argument("--source-root", required=True)
 args = parser.parse_args()
 # Serverless Python tasks execute via exec(), where __file__ is not defined.
@@ -58,33 +60,43 @@ def evidence(version) -> Evidence:
                     labels_digest=run.data.params.get("digest_training_labels"))
 
 
+def evaluate(challenger_version) -> dict:
+    champion_version = by_alias("champion")
+    challenger = evidence(challenger_version)
+    champion = evidence(champion_version) if champion_version else None
+
+    baseline, blockers = None, []
+    if challenger.subset and re.fullmatch(r"FD00[1-4]", challenger.subset) and challenger.labels_digest:
+        labels = label_frame(spark.table(f"{args.catalog}.gold.cmapss_training_labels")
+                             .filter(F.col("subset") == challenger.subset).toPandas(), challenger.subset)
+        if digest(labels[["unit", "cycle", "rul"]]) == challenger.labels_digest:
+            baseline = constant_baseline_rmse(labels, challenger.fit_units, challenger.validation_units)
+        else:
+            blockers.append("Gold training labels changed since the challenger was trained; retrain first")
+    blockers += decide(challenger, champion, baseline, args.max_baseline_ratio, args.tolerance)
+
+    decision = {"model": name, "challenger": challenger.version, "champion_before": champion and champion.version,
+                "challenger_validation_rmse": challenger.validation_rmse, "validation_baseline_rmse": baseline,
+                "champion_validation_rmse": champion and champion.validation_rmse,
+                "validation_units": list(challenger.validation_units), "max_baseline_ratio": args.max_baseline_ratio,
+                "tolerance": args.tolerance, "promoted": not blockers, "reasons": blockers}
+    version = str(challenger.version)
+    client.set_model_version_tag(name, version, "promotion_decision", "promoted" if not blockers else "rejected")
+    client.set_model_version_tag(name, version, "promotion_reasons", "; ".join(blockers)[:4000] or "all gates passed")
+    if not blockers:
+        client.set_registered_model_alias(name, "champion", challenger.version)
+        client.delete_registered_model_alias(name, "challenger")
+    decision["champion_after"] = int(client.get_model_version_by_alias(name, "champion").version) if not blockers else decision["champion_before"]
+    return decision
+
+
 challenger_version = by_alias("challenger")
-if challenger_version is None:
+decided = challenger_version is not None and challenger_version.tags.get("promotion_decision")
+if args.only_pending and (challenger_version is None or decided):
+    # Orchestrated runs: training was skipped, or this challenger was already decided once.
+    print(json.dumps({"evaluated": False, "reason": "no @challenger" if challenger_version is None
+                      else f"v{challenger_version.version} already {decided}"}))
+elif challenger_version is None:
     raise SystemExit("No @challenger version to evaluate")
-champion_version = by_alias("champion")
-challenger = evidence(challenger_version)
-champion = evidence(champion_version) if champion_version else None
-
-baseline, blockers = None, []
-if challenger.subset and re.fullmatch(r"FD00[1-4]", challenger.subset) and challenger.labels_digest:
-    labels = label_frame(spark.table(f"{args.catalog}.gold.cmapss_training_labels")
-                         .filter(F.col("subset") == challenger.subset).toPandas(), challenger.subset)
-    if digest(labels[["unit", "cycle", "rul"]]) == challenger.labels_digest:
-        baseline = constant_baseline_rmse(labels, challenger.fit_units, challenger.validation_units)
-    else:
-        blockers.append("Gold training labels changed since the challenger was trained; retrain first")
-blockers += decide(challenger, champion, baseline, args.max_baseline_ratio, args.tolerance)
-
-decision = {"model": name, "challenger": challenger.version, "champion_before": champion and champion.version,
-            "challenger_validation_rmse": challenger.validation_rmse, "validation_baseline_rmse": baseline,
-            "champion_validation_rmse": champion and champion.validation_rmse,
-            "validation_units": list(challenger.validation_units), "max_baseline_ratio": args.max_baseline_ratio,
-            "tolerance": args.tolerance, "promoted": not blockers, "reasons": blockers}
-version = str(challenger.version)
-client.set_model_version_tag(name, version, "promotion_decision", "promoted" if not blockers else "rejected")
-client.set_model_version_tag(name, version, "promotion_reasons", "; ".join(blockers)[:4000] or "all gates passed")
-if not blockers:
-    client.set_registered_model_alias(name, "champion", challenger.version)
-    client.delete_registered_model_alias(name, "challenger")
-decision["champion_after"] = int(client.get_model_version_by_alias(name, "champion").version) if not blockers else decision["champion_before"]
-print(json.dumps(decision))
+else:
+    print(json.dumps(evaluate(challenger_version)))

@@ -1,0 +1,134 @@
+{
+  "job": {
+    "name": "cmapss_retrain",
+    "job_id": 1037945637149770,
+    "tasks": [
+      "ingest",
+      "verify",
+      "train",
+      "promote",
+      "score",
+      "monitor",
+      "alerts"
+    ],
+    "parameters": {
+      "force_retrain": "false",
+      "max_rmse_increase": "0.2",
+      "max_psi": "0.2",
+      "max_snapshot_age_hours": "24"
+    }
+  },
+  "unchanged_data_run": {
+    "run_id": 599725542930474,
+    "result": "SUCCESS",
+    "minutes": 23.3,
+    "task_minutes": {
+      "ingest": 11.3,
+      "verify": 9.3,
+      "train": 0.6,
+      "promote": 0.4,
+      "score": 0.5,
+      "monitor": 0.6,
+      "alerts": 0.6
+    },
+    "pipeline_update": {
+      "update_id": "c2bc60cc-c937-4a95-9675-de68568403e3",
+      "state": "COMPLETED",
+      "cause": "JOB_TASK",
+      "bronze_appended": {
+        "cmapss_lines": 0,
+        "cmapss_labels": 0
+      },
+      "downstream_refresh": "NO_OP for all 7 flows"
+    },
+    "verify": {
+      "verified_runs": 3,
+      "counts_unchanged": true,
+      "billing_snapshot": "denied: no USE SCHEMA on system.billing"
+    },
+    "train": {
+      "retrained": false,
+      "reason": "Gold training inputs unchanged",
+      "champion_version": 3,
+      "digests": {
+        "features": "efdbf289f866a12d",
+        "training_labels": "bd98d8c49e59152c",
+        "test_endpoints": "d11a9f153d9624c1"
+      },
+      "champion_run_params_match": true
+    },
+    "promote": {
+      "evaluated": false,
+      "reason": "no @challenger"
+    },
+    "score": {
+      "champion_version": 3,
+      "pending_rows": 0,
+      "logged_rows_for_version": 13096
+    },
+    "monitor": {
+      "labels_merged": 0,
+      "endpoint_rmse": 18.341479192292436,
+      "actual_le_125_rmse": 19.174899577687704,
+      "age_matched_psi_over_0_2": 0,
+      "raw_psi_over_0_2": 26,
+      "features": 43
+    },
+    "alerts": {
+      "checks": 47,
+      "breaches": 0,
+      "worst_psi_age_matched": {
+        "feature": "sensor_17_mean_10",
+        "value": 0.1025
+      },
+      "endpoint_rmse_increase": 0.0
+    }
+  },
+  "breach_tests": [
+    {
+      "run_id": 245262911606779,
+      "request": {
+        "only": [
+          "alerts"
+        ],
+        "job_parameters": {
+          "max_psi": "0.05"
+        }
+      },
+      "result": "FAILED",
+      "life_cycle_state": "INTERNAL_ERROR",
+      "breaches": 20,
+      "checks": 47,
+      "attempts": 2,
+      "attempt_minutes": [
+        6.8,
+        0.6
+      ],
+      "finding": "Serverless auto-optimization retried the failed task although max_retries is 0; both attempts appended their checks"
+    },
+    {
+      "run_id": 955572570273055,
+      "request": {
+        "only": [
+          "alerts"
+        ],
+        "job_parameters": {
+          "max_psi": "0.05"
+        }
+      },
+      "result": "FAILED",
+      "life_cycle_state": "INTERNAL_ERROR",
+      "attempts": 1,
+      "attempt_minutes": [
+        7.9
+      ],
+      "after_fix": "disable_auto_optimization: true on every task of every job (12 jobs updated)"
+    }
+  ],
+  "retrain_branch": "not run in the cloud (user's choice: avoid registering an identical v4); it runs the unchanged cmapss_train/cmapss_promote code verified in earlier milestones",
+  "cost_estimate_cad": {
+    "serverless_minutes": 40,
+    "approx": 0.65,
+    "note": "at ~1.5 DBU per hour of job time and ~CAD 0.62/DBU; no model-serving calls"
+  }
+}

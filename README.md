@@ -85,11 +85,12 @@ this timeout reduces exposure but is not a hard billing cap.
 
 ## Next milestones
 
-1. Real-time serving demo, orchestrated retraining (ingest → verify → train →
-   promote), and alerts on drift/performance. Batch operations are already in
-   place: validation-gated promotion (v3 is `@champion`), idempotent fleet
-   scoring into `gold.cmapss_predictions`, and delayed-label performance plus
-   age-matched drift monitoring. See [docs/OPERATIONS.md](docs/OPERATIONS.md).
+1. Real-time serving demo. Batch operations are in place: validation-gated
+   promotion (v3 is `@champion`), idempotent fleet scoring into
+   `gold.cmapss_predictions`, and delayed-label performance plus age-matched
+   drift monitoring. The manual job `cmapss_retrain` chains ingest → verify →
+   train (only when Gold training data changed) → promote → score → monitor →
+   threshold alerts. See [docs/OPERATIONS.md](docs/OPERATIONS.md).
 2. Extend training beyond FD001 using the existing composite keys.
 3. Safety assistant over OSHA Severe Injury Reports. Done: provenance, a
    privacy-minimized landing, the `osha_safety` pipeline to Gold (105,993

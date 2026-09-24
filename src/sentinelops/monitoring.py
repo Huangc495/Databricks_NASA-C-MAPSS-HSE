@@ -62,6 +62,40 @@ def age_weights(reference_age: pd.Series, current_age: pd.Series, bins: int = 10
     return np.where(in_range, ratio[reference_bin], 0.0)
 
 
+ALERT_SEGMENTS = ("endpoint", f"actual_le_{LABEL_CAP}")
+
+
+def alert_checks(performance: pd.DataFrame, drift_snapshots: pd.DataFrame, now: pd.Timestamp,
+                 max_rmse_increase: float, max_psi: float, max_age_hours: float) -> pd.DataFrame:
+    """One row per check (check, subject, value, threshold, breached) for one model version.
+
+    `performance` holds that version's snapshots (segment, rmse, computed_at). RMSE is
+    compared with the version's first snapshot, a relative threshold fixed in advance, never
+    with test-set results. `drift_snapshots` (feature, psi_age_matched, computed_at) are
+    checked at their latest snapshot. Snapshots older than `max_age_hours` also breach.
+    """
+    rows = []
+    for name, frame in (("performance", performance), ("drift", drift_snapshots)):
+        age = (now - frame.computed_at.max()).total_seconds() / 3600 if len(frame) else float("inf")
+        rows.append({"check": "snapshot_age_hours", "subject": name, "value": age, "threshold": max_age_hours,
+                     "breached": bool(age > max_age_hours)})
+    for segment in ALERT_SEGMENTS:
+        history = performance[performance.segment == segment].sort_values("computed_at")
+        if history.empty:
+            rows.append({"check": "rmse_increase", "subject": segment, "value": float("nan"),
+                         "threshold": max_rmse_increase, "breached": True})
+            continue
+        increase = history.rmse.iloc[-1] / history.rmse.iloc[0] - 1
+        rows.append({"check": "rmse_increase", "subject": segment, "value": float(increase),
+                     "threshold": max_rmse_increase, "breached": bool(increase > max_rmse_increase)})
+    if len(drift_snapshots):
+        latest = drift_snapshots[drift_snapshots.computed_at == drift_snapshots.computed_at.max()]
+        rows += [{"check": "psi_age_matched", "subject": row.feature, "value": float(row.psi_age_matched),
+                  "threshold": max_psi, "breached": bool(row.psi_age_matched > max_psi)}
+                 for row in latest.itertuples()]
+    return pd.DataFrame(rows, columns=["check", "subject", "value", "threshold", "breached"])
+
+
 def drift(reference: pd.DataFrame, current: pd.DataFrame, columns: list[str], age: str = "cycle") -> pd.DataFrame:
     """Raw PSI, plus PSI against an age-matched reference. Fleet engines are observed
     earlier in life than run-to-failure training data, so raw PSI mostly measures age."""

@@ -18,4 +18,18 @@ def test_every_job_is_manual_standard_single_run_bounded_and_not_retried():
         assert job.get("timeout_seconds", 0) > 0, name
         assert not {"schedule", "trigger", "continuous"} & set(job), name
         for task in job["tasks"]:
-            assert task["max_retries"] == 0, (name, task["task_key"])
+            # Serverless auto-optimization retries failed tasks even with max_retries 0 (seen on
+            # cmapss_retrain run 245262911606779), which could repeat paid model calls.
+            assert task["max_retries"] == 0 and task["disable_auto_optimization"] is True, (name, task["task_key"])
+
+
+def test_retraining_chain_runs_in_order_and_retrains_only_on_change():
+    job = dict(jobs())["cmapss_retrain"]
+    keys = [task["task_key"] for task in job["tasks"]]
+    assert keys == ["ingest", "verify", "train", "promote", "score", "monitor", "alerts"]
+    for previous, task in zip(job["tasks"], job["tasks"][1:]):
+        assert task["depends_on"] == [{"task_key": previous["task_key"]}] and "run_if" not in task
+    parameters = {task["task_key"]: task.get("spark_python_task", {}).get("parameters", []) for task in job["tasks"]}
+    assert "--only-if-changed" in parameters["train"] and "--only-pending" in parameters["promote"]
+    assert {p["name"]: p["default"] for p in job["parameters"]}["force_retrain"] == "false"
+    assert job["timeout_seconds"] >= sum(task["timeout_seconds"] for task in job["tasks"])
