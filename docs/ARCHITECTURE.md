@@ -89,8 +89,11 @@ Additional external locations are deferred until a source needs access outside
 the existing managed volume. Do not repeatedly tune against the fixed official
 test set; the fleet monitoring metrics reuse those engines.
 
-Safety RAG is a separate delivery milestone: acquire OSHA data with provenance,
-remove unnecessary personal/employer/address details, preserve source citations,
-create retrieval and abstention evaluations, then integrate the selected hosted
-LLM and Vector Search only after verifying availability and cost. Incident
-similarity alone does not establish causes or regulatory compliance.
+Safety RAG ([SAFETY_RAG.md](SAFETY_RAG.md)) has its own pipeline,
+`osha_safety`. Checksummed OSHA reports are minimized locally, with employer,
+address and location fields removed and masked in narratives, then landed and
+ingested through Bronze → Silver (with quarantine) → Gold `osha_documents`,
+keyed by `report_id`, which is the citation key. Retrieval will be exact
+cosine search over pay-per-token embeddings stored in Delta, because a
+Vector Search endpoint alone costs ~CAD 9.3/day. Incident similarity alone does
+not establish causes or regulatory compliance.

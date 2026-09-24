@@ -91,7 +91,11 @@ this timeout reduces exposure but is not a hard billing cap.
    scoring into `gold.cmapss_predictions`, and delayed-label performance plus
    age-matched drift monitoring. See [docs/OPERATIONS.md](docs/OPERATIONS.md).
 2. Extend training beyond FD001 using the existing composite keys.
-3. Add OSHA ingestion, retrieval, grounded generation and evaluation.
+3. Safety assistant over OSHA Severe Injury Reports. Done: provenance, a
+   privacy-minimized landing, and the `osha_safety` pipeline to Gold (105,993
+   documents). Next: embeddings, exact retrieval, cited answers and evaluation.
+   See [docs/SAFETY_RAG.md](docs/SAFETY_RAG.md). Data courtesy of the U.S.
+   Department of Labor (OSHA); no endorsement implied.
 4. Add Event Hubs/API sources, dashboard/Genie and OIDC staging/production CI/CD.
 
 Dataset provenance: NASA PCoE, [Zenodo record 15346912](https://zenodo.org/records/15346912),

@@ -1,0 +1,84 @@
+{
+  "pipeline_id": "7d53a0fb-d724-4628-a854-23dc1d0e283a",
+  "update_id": "9688b610-1995-4357-967c-9289574e4c7d",
+  "state": "COMPLETED",
+  "flows": [
+    {
+      "flow": "sentinelops_dev.bronze.osha_sir_reports",
+      "refresh": "STREAMING_APPEND",
+      "output_rows": 0,
+      "data_quality": null
+    },
+    {
+      "flow": "sentinelops_dev.gold.osha_documents",
+      "refresh": "COMPLETE_RECOMPUTE",
+      "output_rows": 105993,
+      "data_quality": {
+        "dropped_records": 0,
+        "warned_records": 0
+      }
+    },
+    {
+      "flow": "sentinelops_dev.silver.osha_incidents",
+      "refresh": "COMPLETE_RECOMPUTE",
+      "output_rows": 105993,
+      "data_quality": {
+        "dropped_records": 3,
+        "expectations": [
+          {
+            "dataset": "valid_reports",
+            "failed_records": 3,
+            "name": "has_narrative",
+            "passed_records": 105993
+          },
+          {
+            "dataset": "valid_reports",
+            "failed_records": 0,
+            "name": "valid_month",
+            "passed_records": 105996
+          },
+          {
+            "dataset": "valid_reports",
+            "failed_records": 0,
+            "name": "valid_naics",
+            "passed_records": 105996
+          },
+          {
+            "dataset": "valid_reports",
+            "failed_records": 0,
+            "name": "has_event_code",
+            "passed_records": 105996
+          },
+          {
+            "dataset": "valid_reports",
+            "failed_records": 0,
+            "name": "has_state",
+            "passed_records": 105996
+          },
+          {
+            "dataset": "valid_reports",
+            "failed_records": 0,
+            "name": "has_report_id",
+            "passed_records": 105996
+          },
+          {
+            "dataset": "valid_reports",
+            "failed_records": 0,
+            "name": "schema_conforms",
+            "passed_records": 105996
+          }
+        ],
+        "warned_records": 0
+      }
+    },
+    {
+      "flow": "sentinelops_dev.silver.osha_quarantine",
+      "refresh": "COMPLETE_RECOMPUTE",
+      "output_rows": 3,
+      "data_quality": {
+        "dropped_records": 0,
+        "warned_records": 0
+      }
+    }
+  ]
+}

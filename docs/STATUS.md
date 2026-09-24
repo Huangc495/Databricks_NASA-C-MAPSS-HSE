@@ -2,7 +2,47 @@
 
 Last verified: September 23, 2026.
 
-## Current milestone: batch operational ML (promote, score, monitor)
+## Current milestone: Safety GenAI data foundation (OSHA)
+
+Source, license, privacy and cost checks are done. Minimized OSHA reports are
+in Bronze/Silver/Gold. No embeddings or model calls yet. Design:
+[SAFETY_RAG.md](SAFETY_RAG.md).
+
+- **Source:** with the user's approval, downloaded OSHA's
+  `January2015toNovember2025.zip` (16,224,511 bytes, matching the server's
+  `Content-Length`). SHA-256 `a3f7f434…46bb0` is pinned. It holds one UTF-8 CSV
+  with 105,996 reports (2015-01 to 2025-11). The data is a federal
+  public-domain work; attribution to DOL is recorded in the manifest. `ID` is
+  not unique (5 IDs cover two incidents each); `UPA` is unique and is used as
+  `report_id`.
+- **Privacy:** employer, address, city, ZIP, coordinates and inspection numbers
+  are dropped locally before upload, and event dates are coarsened to month. In
+  narratives, the report's own employer and address, numbered streets and
+  state+ZIP are masked: 282 narratives, 300 replacements. Scans found no
+  emails, phones, SSNs or personal names. The residual risks (dates, cities,
+  other companies) are documented.
+- **Cost decision (user-approved):** exact retrieval over Delta-stored
+  embeddings, no Vector Search endpoint. A Standard endpoint costs ~CAD 9.3/day
+  and keeps billing for 24 h after the last index is deleted, which would
+  exceed the $10/day budget. Qwen3 embeddings for the full corpus are estimated
+  at ~CAD 0.15 in tokens.
+- **Pipeline `osha_safety`** (`7d53a0fb-d724-4628-a854-23dc1d0e283a`), job
+  `osha_ingest` (`1070808576153729`):
+  - Run `1007139224127625` **SUCCESS**. Bronze 105,996 rows, schema-conformant
+    (nothing rescued). 6 rows quarantined: 3 near-empty narratives, 2 blank
+    industry codes, and 1 sector range `48-49`.
+  - The industry-code rule was then relaxed, because industry is optional
+    metadata. Run `197582638913248` **SUCCESS**: Bronze appended 0 rows (the
+    checkpoint held), quarantine is **3** (only narratives under 20 characters),
+    and Silver `osha_incidents` and Gold `osha_documents` (primary key
+    `report_id`) each have **105,993** rows.
+  - Evidence: [osha-first-update.json](osha-first-update.json),
+    [osha-rule-update.json](osha-rule-update.json).
+- **Tests:** 24 local tests pass (four new OSHA tests: masking, minimization,
+  checksum, immutability). Real data exposed two issues before upload, both
+  fixed: blank severity counts, and ZIP codes and numbered streets in narratives.
+
+## Previous milestone: batch operational ML (promote, score, monitor)
 
 A champion now scores the simulated fleet into an idempotent inference log.
 Delayed labels are merged, and performance and drift snapshots are recorded.
@@ -39,7 +79,7 @@ See [OPERATIONS.md](OPERATIONS.md) for the design. No Azure resources were creat
 - Not done: no real-time serving endpoint or inference tables; no schedules
   or alerts; no Lakehouse Monitoring monitor (metrics are computed by the job).
 
-## Previous milestone: incremental checks passed; training consumes Gold
+## Earlier milestone: incremental checks passed; training consumes Gold
 
 All outstanding medallion checks have run in the cloud, and training now reads
 the Gold tables. No Azure resources were created; one bundle job was added.
@@ -209,7 +249,10 @@ completion of the full SentinelOps platform.
    Additional external locations are deferred until needed.
 2. Extend beyond FD001 (FD002–FD004 need operating-condition handling); the
    `(dataset, subset, split, unit, cycle)` keys and `--subset` parameter support it.
-3. Build OSHA safety RAG with retrieval, citations, privacy handling and evaluation.
+3. Continue the OSHA safety assistant; data, privacy and cost design are done.
+   Next: the embedding job (Qwen3 via `ai_query`), exact retrieval, and a
+   retrieval evaluation set; then grounded answers with citations, abstention
+   and tracing, an LLM-judge evaluation, and structured extraction.
 4. Add Event Hubs/API ingestion, dashboard/Genie, staging/production and OIDC CI/CD.
 
 ## Cost and runtime controls

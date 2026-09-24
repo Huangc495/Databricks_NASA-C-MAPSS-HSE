@@ -1,8 +1,24 @@
 # SentinelOps — instructions for the next session
 
-Last updated: September 23, 2026 (batch operational ML continuation).
+Last updated: September 23, 2026 (Safety GenAI data foundation).
 
-## Latest continuation — batch operational ML
+## Latest continuation — Safety GenAI data foundation
+
+Read `docs/SAFETY_RAG.md` and the STATUS current milestone.
+- The user approved downloading OSHA's `January2015toNovember2025.zip` (pinned
+  SHA-256 in `src/sentinelops/osha.py`); the raw archive stays local in `data/osha/`.
+- `python -m sentinelops.osha` writes the minimized per-year JSONL files and a
+  manifest. They are uploaded (immutable) to
+  `/Volumes/sentinelops_dev/sentinelops_dev/landing/osha_sir/v1`. Do not
+  re-upload or overwrite them.
+- Pipeline `osha_safety` `7d53a0fb-d724-4628-a854-23dc1d0e283a` and manual job
+  `osha_ingest` `1070808576153729` feed `gold.osha_documents` (105,993 rows;
+  3 quarantined).
+- The user chose **no Vector Search endpoint** (~CAD 9.3/day plus a 24 h
+  billing tail); use exact retrieval over Delta embeddings. Model calls are
+  pay-per-token only; none have been made yet.
+
+## Previous continuation — batch operational ML
 
 Read `docs/STATUS.md` (current milestone) and `docs/OPERATIONS.md` first.
 New jobs: `cmapss_promote` `714826690927619` and `cmapss_score`
@@ -105,6 +121,7 @@ the normal approval mechanism; do not bypass controls or expose tokens.
 | MLflow run ID | `d4cb1f49d8444811999bbaa4dcccbfc0` |
 | Registered model | `sentinelops_dev.sentinelops_dev.turbofan_rul` |
 | Bootstrap model version | **2**, **READY**, no alias (was challenger) |
+| OSHA pipeline / job | `osha_safety` `7d53a0fb-d724-4628-a854-23dc1d0e283a` / `osha_ingest` `1070808576153729` |
 | Gold-trained version / alias | **3**, **READY**, **champion** (trained by `cmapss_train` run `174998841420766`; promoted by `cmapss_promote` run `268300947742291`) |
 
 The external location points to
@@ -224,10 +241,13 @@ zero application retries, 900-second timeout, and no recurring schedule.
    (docs/OPERATIONS.md). Remaining: a bounded serving demo using Gold-format
    features (never pandas-recomputed features), orchestrated retraining, and
    alerts. No serving endpoint exists.
-3. **Safety RAG:** verify/download OSHA sources, record provenance and license,
-   handle unnecessary personal/address data, build chunks and retrieval, add
-   grounded answers with citations/abstention, tracing/evaluations and structured
-   extraction. Verify affordable regional Vector Search/model availability first.
+3. **Safety RAG** (docs/SAFETY_RAG.md): source, license, privacy
+   minimization, cost check and the Gold `osha_documents` table are done. The
+   user chose exact retrieval with **no Vector Search endpoint**. Next: the
+   Qwen3 embedding job via `ai_query`, exact top-k retrieval with an evaluation
+   set built from OSHA codes, then grounded answers (GPT-OSS-120B) with
+   `[report_id]` citations and abstention, MLflow tracing, an LLM-judge
+   evaluation (Llama 3.3 70B), and structured extraction scored against the codes.
 4. **Remaining platform:** API ingestion and Event Hubs streaming, AI/BI dashboard
    and Genie, environment isolation and service-principal/OIDC staging/prod
    delivery, appropriate networking/governance, demo script and portfolio polish.

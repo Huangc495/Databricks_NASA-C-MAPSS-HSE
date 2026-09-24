@@ -1,0 +1,33 @@
+resources:
+  pipelines:
+    osha_safety:
+      name: sentinelops-osha-safety
+      catalog: ${var.catalog}
+      schema: bronze
+      serverless: true
+      continuous: false
+      development: false
+      channel: CURRENT
+      edition: ADVANCED
+      libraries:
+        - file:
+            path: ../pipelines/osha.py
+      configuration:
+        sentinelops.catalog: ${var.catalog}
+        sentinelops.osha_landing: /Volumes/${var.catalog}/${var.schema}/landing/osha_sir/v1
+        pipelines.maxFlowRetryAttempts: '0'
+        pipelines.numUpdateRetryAttempts: '0'
+  jobs:
+    # Manual only. Lands minimized OSHA reports into Bronze/Silver/Gold.
+    osha_ingest:
+      name: sentinelops-osha-ingest
+      max_concurrent_runs: 1
+      timeout_seconds: 900
+      performance_target: STANDARD
+      tasks:
+        - task_key: osha_medallion
+          max_retries: 0
+          timeout_seconds: 900
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.osha_safety.id}
+            full_refresh: false
