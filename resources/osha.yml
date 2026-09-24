@@ -15,6 +15,8 @@ resources:
       configuration:
         sentinelops.catalog: ${var.catalog}
         sentinelops.osha_landing: /Volumes/${var.catalog}/${var.schema}/landing/osha_sir/v1
+        # Masking v2 (shortened employer names); its copies supersede v1's in Silver.
+        sentinelops.osha_landing_later: /Volumes/${var.catalog}/${var.schema}/landing/osha_sir/v2
         pipelines.maxFlowRetryAttempts: '0'
         pipelines.numUpdateRetryAttempts: '0'
   jobs:
@@ -101,7 +103,7 @@ resources:
               - mlflow==3.16.1
     # Manual only. Grounded answers with code-checked [report_id] citations and a calibrated
     # decline rule (GPT-OSS-120B over 256-dim exact retrieval), judged by Llama 3.3 70B on
-    # held-out questions (eval_v2; eval_v1 reruns as a regression set). One MLflow trace per
+    # held-out questions (eval_v3_identity; eval_v2 reruns as a regression set). One MLflow trace per
     # question; pay-per-token endpoints only.
     osha_answer_eval:
       name: sentinelops-osha-answer-eval
@@ -135,7 +137,7 @@ resources:
               - --workers
               - '2'
               - --question-sets
-              - eval_v2,eval_v1
+              - eval_v3_identity,eval_v2
               - --job-run-id
               - '{{job.run_id}}'
               - --source-root

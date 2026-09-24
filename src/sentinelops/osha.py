@@ -31,6 +31,54 @@ SUFFIX = re.compile(r"(?:[\s,]+(?:inc|llc|l\.l\.c|corp|corporation|co|company|lt
 STREET = re.compile(r"\b\d{1,6}(?:\s+(?:[A-Z][A-Za-z]*\.?|\d+(?:st|nd|rd|th)?)){1,4}\s+(?:Street|St|Avenue|Ave"
                     r"|Road|Rd|Drive|Dr|Boulevard|Blvd|Lane|Ln|Highway|Hwy|Parkway|Pkwy|Court|Ct|Way|Place|Pl)\b\.?")
 ZIP = re.compile(r"\b([A-Z]{2}),?\s+\d{5}(?:-\d{4})?\b")
+# Masking v2 (landing osha_sir/v2): narratives also use shortened employer names (the first words
+# of a longer legal name, a trading name after "dba", or one distinctive word). Eval v2 found the
+# assistant repeating one that v1 masking missed.
+MASKING_VERSION = "v2"
+DBA = re.compile(r"\s+(?:d\s*/\s*b\s*/\s*a|d\.?b\.?a\.?|doing business as)\s+", re.IGNORECASE)
+NAME_WORD = re.compile(r"[A-Za-z][A-Za-z'&-]+")
+US_STATES = frozenset(
+    "alabama alaska arizona arkansas california colorado connecticut delaware florida georgia hawaii idaho illinois "
+    "indiana iowa kansas kentucky louisiana maine maryland massachusetts michigan minnesota mississippi missouri "
+    "montana nebraska nevada ohio oklahoma oregon pennsylvania tennessee texas utah vermont virginia washington "
+    "wisconsin wyoming".split())
+# Business words that never identify an employer on their own.
+BUSINESS_WORDS = frozenset(
+    "the a an and of for inc llc co corp company corporation ltd lp llp services service group construction "
+    "industries industry enterprises enterprise usa us america american national international united general city "
+    "county state department farms farm systems solutions holdings holding partners associates contractors "
+    "contracting manufacturing products company's inc's".split())
+
+
+def common_words(narratives, min_documents: int = 50) -> frozenset:
+    """Words that appear in lowercase in at least `min_documents` narratives: ordinary vocabulary.
+    Counting lowercase occurrences keeps proper nouns (always capitalized) out of the list."""
+    counts = {}
+    for text in narratives:
+        for word in {w for w in NAME_WORD.findall(text) if w.islower()}:
+            counts[word] = counts.get(word, 0) + 1
+    return frozenset(w for w, c in counts.items() if c >= min_documents)
+
+
+def name_variants(employer: str, common: frozenset, single_min: int = 4) -> list[tuple[str, bool]]:
+    """Shortened forms of an employer name, as (text, proper_noun_only), longest first.
+
+    Leading word sequences (2+ words) of each name and of any "dba" trading name, and each
+    distinctive single word (not a business word, not ordinary vocabulary). Every variant is
+    masked only when capitalized as a proper noun: a lowercase "auger" in a narrative is the
+    machine, not "Auger Services" (case-insensitive matching over-masked ~290-1,100 such words).
+    """
+    variants = []
+    for name in DBA.split(employer):
+        words = NAME_WORD.findall(SUFFIX.sub("", name.strip()))
+        ordinary = [w.lower() in BUSINESS_WORDS or w.lower() in common for w in words]
+        for k in range(len(words), 1, -1):
+            if not all(w.lower() in BUSINESS_WORDS for w in words[:k]):
+                variants.append((" ".join(words[:k]), True))
+        # A state name alone doesn't identify an employer, and the state is a structured field anyway.
+        variants += [(w, True) for w, plain in zip(words, ordinary)
+                     if not plain and len(w) >= single_min and w.lower() not in US_STATES]
+    return sorted(dict.fromkeys(variants), key=lambda v: -len(v[0]))
 
 
 def download(destination: Path) -> Path:
@@ -55,24 +103,48 @@ def read_reports(archive: Path) -> pd.DataFrame:
         return pd.read_csv(io.BytesIO(zipped.read(MEMBER)), dtype=str, keep_default_na=False, encoding="utf-8")
 
 
-def _literal(text: str, value: str, token: str) -> tuple[str, int]:
+def _literal(text: str, value: str, token: str, proper_noun_only: bool = False, min_length: int = 5,
+             matched: list | None = None) -> tuple[str, int]:
     value = " ".join(value.split())
-    if len(value) < 5:  # Too short to mask without clobbering ordinary words.
+    if len(value) < min_length:  # Too short to mask without clobbering ordinary words.
         return text, 0
-    pattern = r"(?<!\w)" + r"\s+".join(re.escape(part) for part in value.split()) + r"(?!\w)"
-    return re.subn(pattern, token, text, flags=re.IGNORECASE)
+    if proper_noun_only:  # each word capitalized, the rest in any case: "Power Line", "POWER LINE"
+        parts = [re.escape(p[0].upper()) + "(?i:" + re.escape(p[1:]) + ")" for p in value.split()]
+        pattern, flags = r"(?<!\w)" + r"\s+".join(parts) + r"(?!\w)", 0
+    else:
+        pattern, flags = r"(?<!\w)" + r"\s+".join(re.escape(part) for part in value.split()) + r"(?!\w)", re.IGNORECASE
+    if matched is not None:
+        matched += re.findall(pattern, text, flags=flags)
+    return re.subn(pattern, token, text, flags=flags)
 
 
-def mask(narrative: str, employer: str, addresses: list[str]) -> tuple[str, int]:
-    """Mask the report's employer and addresses, street addresses and state+ZIP; normalize whitespace."""
-    text, total = " ".join(narrative.split()), 0
+def mask(narrative: str, employer: str, addresses: list[str], common: frozenset | None = None,
+         single_min: int = 4, detail: bool = False):
+    """Mask the report's employer and addresses, street addresses and state+ZIP; normalize whitespace.
+
+    Without `common` this is masking v1 (full and suffix-free employer names), which produced
+    landing osha_sir/v1. With `common` (see common_words) it also masks shortened names (v2).
+    With `detail`, also returns counts of the kinds of matches, for measuring over-masking.
+    """
+    text, total, matched = " ".join(narrative.split()), 0, []
     core = SUFFIX.sub("", employer.strip())
-    for value, token in [(employer, "[EMPLOYER]"), (core, "[EMPLOYER]"), *[(a, "[ADDRESS]") for a in addresses]]:
-        text, count = _literal(text, value, token)
+    names = [(employer, False, 5), (core, False, 5)]
+    if common is not None:
+        names += [(v, proper, single_min if " " not in v else 5) for v, proper in name_variants(employer, common, single_min)]
+    for value, proper, min_length in names:
+        text, count = _literal(text, value, "[EMPLOYER]", proper, min_length, matched)
+        total += count
+    for address in addresses:
+        text, count = _literal(text, address, "[ADDRESS]")
         total += count
     text, streets = STREET.subn("[ADDRESS]", text)
     text, zips = ZIP.subn(r"\1 [ZIP]", text)
-    return text, total + streets + zips
+    if not detail:
+        return text, total + streets + zips
+    info = {"employer_matches": len(matched), "lowercase_matches": sum(m.islower() for m in matched),
+            "single_word_matches": sum(" " not in m.strip() for m in matched),
+            "state_name_matches": sum(m.strip().lower() in US_STATES for m in matched)}
+    return text, total + streets + zips, info
 
 
 def _count(values: pd.Series) -> pd.Series:
@@ -90,12 +162,16 @@ def _blank_to_none(values: pd.Series) -> pd.Series:
     return values.where(values != "", None)
 
 
-def minimize(reports: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
+COMMON_MIN_DOCUMENTS = 50  # chosen on the full corpus: v1 -> v2 capitalized leaks 37 -> 0 (first two name words)
+
+
+def minimize(reports: pd.DataFrame, common_min_documents: int = COMMON_MIN_DOCUMENTS) -> tuple[pd.DataFrame, dict]:
     """Keep only fields the assistant and analytics need; one row per unique UPA."""
     if reports.UPA.duplicated().any() or not reports.UPA.str.fullmatch(r"\d+").all():
         raise ValueError("UPA must be a unique numeric report key")
     dates = pd.to_datetime(reports.EventDate, format="%m/%d/%Y", errors="raise")
-    masked = [mask(n, e, [a1, a2]) for n, e, a1, a2 in
+    common = common_words(reports["Final Narrative"], common_min_documents)
+    masked = [mask(n, e, [a1, a2], common=common) for n, e, a1, a2 in
               zip(reports["Final Narrative"], reports.Employer, reports.Address1, reports.Address2)]
     out = pd.DataFrame({
         "report_id": reports.UPA.astype("int64"),
@@ -114,7 +190,8 @@ def minimize(reports: pd.DataFrame) -> tuple[pd.DataFrame, dict]:
         out[f"{name}_code"] = _blank_to_none(reports[column])
         out[f"{name}_title"] = _blank_to_none(reports[TITLES[column]])
     stats = {"rows": len(out), "masked_narratives": sum(1 for _, n in masked if n),
-             "mask_replacements": sum(n for _, n in masked), "dropped_columns": DROPPED}
+             "mask_replacements": sum(n for _, n in masked), "dropped_columns": DROPPED,
+             "masking_version": MASKING_VERSION, "common_word_min_documents": common_min_documents}
     return out, stats
 
 
@@ -143,5 +220,6 @@ def prepare(source: Path, destination: Path) -> dict:
 
 
 if __name__ == "__main__":
-    print(json.dumps({k: v for k, v in prepare(Path("data/osha"), Path("data/landing/osha_v1")).items()
+    # osha_v1 (masking v1) is immutable and already landed; masking v2 writes a new version.
+    print(json.dumps({k: v for k, v in prepare(Path("data/osha"), Path("data/landing/osha_v2")).items()
                       if k != "files"}, indent=2))

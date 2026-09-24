@@ -1,19 +1,19 @@
 # Build status
 
-Last verified: September 24, 2026, 18:40 UTC (real-time serving demo and answer evaluation v2).
+Last verified: September 24, 2026, 19:40 UTC (employer-name masking v2).
 
 **At a glance.**
 
-- **Progress:** 27 of 40 tracked tasks are done. Next is fixing the
-  employer-name masking gap that eval v2 found (needs your approval for a new
-  landing upload); 10 tasks are not started and 2 are deferred.
+- **Progress:** 28 of 40 tracked tasks are done. Next is REST API ingestion
+  (it needs your choice of source and approval of the download); 9 tasks are
+  not started and 2 are deferred.
 - **Live state (read-only checks):** no active job runs, no classic clusters,
   no Vector Search or custom serving endpoints, and all pipelines IDLE. The
   starter warehouse is STOPPED (2X-Small, 5-minute auto-stop). `@champion` is
   v3 (READY).
-- **Cost:** September 24 is projected at about CAD 12.6 (over CAD 10), after
-  the serving demo and eval v2 you approved against your credits, which
-  expire October 10. See "Cost and runtime controls".
+- **Cost:** September 24 is projected at about CAD 13.4 (over CAD 10). The
+  serving demo, eval v2 and masking v2 were approved against your credits,
+  which expire October 10. See "Cost and runtime controls".
 - **Git:** every milestone is committed on `main`; there is no remote.
 
 ## Task status
@@ -28,7 +28,7 @@ cost or prerequisites, with the reason given.
 | Task | Status | Evidence or next action |
 |---|---|---|
 | Azure foundation: ADLS Gen2, workspace, access connector, UC catalog | Done | `infra/main.bicep`; "Azure" section below |
-| Bundle deployment (dev target, strict validation, manual jobs) | Done | `databricks.yml`, `resources/*.yml`; 13 jobs, 2 pipelines, 2 dashboards and 1 Genie space deployed; a test enforces job guardrails, including no serverless auto-retries |
+| Bundle deployment (dev target, strict validation, manual jobs) | Done | `databricks.yml`, `resources/*.yml`; 14 jobs, 2 pipelines, 2 dashboards and 1 Genie space deployed; a test enforces job guardrails, including no serverless auto-retries |
 | Cost visibility: meter-level Azure cost query | Done | Found an always-on NAT gateway/IP, ~CAD 1.7/day ("Cost and runtime controls") |
 | Azure budget alert | Done | Budget `sentinelops-dev-monthly` (your choice): CAD 150/month on both SentinelOps resource groups; emails at 50/80/100% of actual and 100% of forecast; `infra/budget.json`. A tripwire (alerts lag 8–24 h), not a cutoff |
 | Databricks billing tables (`system.billing`) access | Not started | Needs an account/metastore admin grant |
@@ -43,7 +43,7 @@ cost or prerequisites, with the reason given.
 | C-MAPSS FD001 Auto Loader + Lakeflow medallion with quarantine/conflicts | Done | Pipeline `77ecd502…`; parity verified |
 | Incremental ingestion probe and no-input rerun | Done | `medallion-probe-*.json`, `medallion-rerun-update.json` |
 | FD002–FD004 (multiple operating conditions) | Not started | Keys and `--subset` already support it; needs condition-aware features |
-| REST API ingestion (e.g. weather/energy JSON) | Not started | |
+| REST API ingestion (e.g. weather/energy JSON) | **Next** | Needs your choice of a keyless, clearly licensed API and approval of the download |
 | Event Hubs (Kafka endpoint) streaming | Not started | Bills while the namespace exists: demo only, then delete |
 
 ### Predictive-maintenance ML
@@ -65,7 +65,7 @@ cost or prerequisites, with the reason given.
 | Task | Status | Evidence or next action |
 |---|---|---|
 | Source, license and provenance (checksum-pinned) | Done | [SAFETY_RAG.md](SAFETY_RAG.md) |
-| Privacy minimization before upload | Done | 282 narratives masked; identifying columns dropped |
+| Privacy minimization before upload | Done | Identifying columns dropped; masking v2 masks 420 narratives (459 replacements; v1 masked 282) |
 | OSHA medallion pipeline to Gold `osha_documents` | Done | 105,993 documents, 3 quarantined |
 | Retrieval cost decision (no Vector Search endpoint) | Done | Chosen by you; endpoint would be ~CAD 9.3/day |
 | Document embeddings (`osha_embed`) | Done | 105,993 vectors; `osha-embedding-backfill.json` |
@@ -73,27 +73,69 @@ cost or prerequisites, with the reason given.
 | Grounded answers with `[report_id]` citations, abstention, MLflow tracing | Done | GPT-OSS-120B over 256-dim retrieval; code-checked citations; threshold 0.6511 + model decline; `osha-answer-eval.json` |
 | LLM-judge evaluation (correctness, groundedness, relevance) | Done (28 held-out questions) | Llama 3.3 70B judge: 28/28 correct answer/decline decisions; on answers, correctness 11/12, groundedness 12/12 |
 | Larger answer evaluation (eval v2) | Done (60 held-out questions) | 58/60 correct decisions; the model declined 20 of 21 unanswerable questions above the threshold. **One answer named an employer** (a masking gap); `osha-answer-eval-v2.json` |
-| Employer-name masking gap | **Next** | Shortened employer names survive in ~74–101 narratives. Stronger masking in a new landing version, re-ingest, re-embed changed documents; needs your approval for the upload |
+| Employer-name masking gap | Done | Masking v2 (landing `osha_sir/v2`): capitalized leading-name leaks 37 → 0; 140 documents re-embedded; no employer names in 76 answers; 13/16 held-out identity requests declined. `osha-masking-v2.json` |
 | Structured extraction scored against OSHA codes | Done | GPT-OSS-120B matches a supervised TF-IDF model on event, nature and body part (0.935/0.943/0.948) but trails on source (0.760 vs 0.825); `osha-extraction-eval.json` |
-| Agent deployment / review app | Deferred | Blocked by the masking gap; then check serving cost, scale-to-zero only |
+| Agent deployment / review app | Deferred | Optional; unblocked by masking v2. Check serving cost first, scale-to-zero only, your approval |
 
 ### Analytics and delivery
 
 | Task | Status | Evidence or next action |
 |---|---|---|
-| Unit tests (90) and local CI workflow file | Done (local) | `.github/workflows/ci.yml` has never run: no remote |
-| Git history | Done (local) | Branch `main`; no remote. Latest milestone commit `b94c34a` |
+| Unit tests (92) and local CI workflow file | Done (local) | `.github/workflows/ci.yml` has never run: no remote |
+| Git history | Done (local) | Branch `main`; no remote; one commit per milestone (`git log`) |
 | GitHub repository, CI runs, OIDC deployment to staging/prod | Not started | Needs your choice of repository and visibility |
 | AI/BI dashboards and Genie space | Done | Fleet health and Safety incidents dashboards, Genie space over 6 curated Gold tables, `analytics_refresh` job; Genie 7/8 held-out questions fully right (one miscounted summary); [ANALYTICS.md](ANALYTICS.md) |
 | SQL warehouse right-sizing | Done | Starter warehouse Small → 2X-Small, auto-stop 10 → 5 min (your approval); a wake-up now costs ~CAD 0.35, not ~2.3 |
 | Demo script and portfolio write-up | Not started | Last |
 
-Recommended order (details in HANDOVER.md section 3): fix the employer-name
-masking gap (before any assistant deployment) → API/streaming sources →
-environments and CI/CD → optional ML depth → demo script and write-up. The
-budget alert, dashboards/Genie, serving demo and eval v2 are done.
+Recommended order (details in HANDOVER.md): REST API ingestion → Event Hubs
+streaming demo → environments and CI/CD → optional ML depth and agent
+deployment → demo script and write-up. The budget alert, dashboards/Genie,
+serving demo, eval v2 and masking v2 are done.
 
-## Current milestone: real-time serving demo and answer evaluation v2
+## Current milestone: employer-name masking v2 (OSHA)
+
+Eval v2 found an answer naming the report's own employer: masking v1 had
+missed shortened employer names. Masking v2 closes that gap. Details:
+[SAFETY_RAG.md](SAFETY_RAG.md#masking-v2-shortened-employer-names); evidence
+[osha-masking-v2.json](osha-masking-v2.json).
+
+- **Rules.** Also mask leading word sequences of the employer name and of
+  "dba" trading names, plus distinctive single words (not business words,
+  not ordinary vocabulary, not states). Every shortened variant is masked
+  only when capitalized as a proper noun.
+- **Development** on the full local corpus (no names printed or uploaded):
+  - capitalized leading-name leaks fell from 37 to **0**, and distinctive-word
+    leaks from 112 to 7;
+  - a case-insensitive first attempt over-masked 289–1,104 ordinary words, so
+    shortened variants are proper-noun only;
+  - state names inside employer names are left alone.
+- **Landing `osha_sir/v2`** (your approval): 105,996 rows, 84,168,207 bytes.
+  Only `narrative` differs from v1, in 140 reports; v1 is untouched.
+- **Ingest run `929857370324250`.** A new append flow `osha_sir_v2` appended
+  105,996 rows, and the v1 flow appended 0, so its checkpoint was untouched.
+  Silver and Gold hold 105,993 reports, with v2 copies winning.
+- **Embed run `771297237993579`:** exactly **140** changed documents were
+  re-embedded (matching the local count), with 0 stale.
+- **Identity check, run `731577238433197`.** 16 new held-out identity
+  requests: 12 about incidents that leaked under v1, 3 generic, and 1 the
+  eval v2 leak paraphrased.
+  - **No employer names in any of 76 answers**, per
+    `scripts/scan_answer_names.py`, run locally against the raw archive. The
+    scanner is validated: it flags the original leak.
+  - 13 of 16 were declined. The other 3 were answered, but only as
+    "[EMPLOYER] Company, LLC" or "the Illinois plant": masking, not the
+    model's decline, is the control that holds.
+  - The eval v2 rerun (regression) made 59/60 correct decisions.
+- **Residual risk:** initials such as "G&H [EMPLOYER]", and other companies'
+  names (contractors), are not masked. The model still answers some
+  incident-style identity questions (without a name).
+- **Cost:** about CAD 0.8 (ingest 11 min, embed 6 min, eval 13 min, 228 judge
+  calls). Nothing is running afterwards.
+- **Tests:** 92 pass (2 new: masking v2 variants, the ordinary-word
+  vocabulary; the identity-set hygiene checks were extended).
+
+## Earlier milestone: real-time serving demo and answer evaluation v2
 
 Both approved on September 24 (your credits last until October 10).
 
@@ -643,7 +685,7 @@ section is kept only so older links still resolve.
   | Day | Posted | By meter | Notes |
   |---|---|---|---|
   | September 23 | CAD 5.41 (final) | Serverless SQL 2.16, serverless jobs 1.85, NAT and IP 1.31 (19 h) | The projection of CAD 3–4 missed a Catalog Explorer browse at 19:23 UTC, which ran the Small warehouse for about 11 minutes (2.2 DBU) |
-  | September 24 | CAD 8.05 by 16:55 UTC (usage to ~11:00) | Serverless jobs 2.60, serverless SQL 2.42 (Catalog Explorer, 05:44), model calls 2.23, NAT and IP 0.76 | Projected ≈ CAD 12.6: the fixed remainder (~0.9), dashboards/Genie (~1.6), then the serving demo and eval v2 (~2.0: serving ≤0.35, jobs ~0.5, model calls ~0.4, warehouse checks ~0.7). Over CAD 10; you approved it against credits expiring October 10 |
+  | September 24 | CAD 8.05 by 16:55 UTC (usage to ~11:00) | Serverless jobs 2.60, serverless SQL 2.42 (Catalog Explorer, 05:44), model calls 2.23, NAT and IP 0.76 | Projected ≈ CAD 13.4: the fixed remainder (~0.9), dashboards/Genie (~1.6), the serving demo and eval v2 (~2.0: serving ≤0.35, jobs ~0.5, model calls ~0.4, warehouse checks ~0.7), then masking v2 (~0.8). Over CAD 10; you approved it against credits expiring October 10. The Cost Management API returned 429 at 18:30–19:36 UTC, so recheck later |
 
 - **Rates** (Azure Retail Prices, `westus2`, CAD):
   - serverless jobs CAD 0.62/DBU (about 1.5 DBU per hour of job time);

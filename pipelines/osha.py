@@ -4,6 +4,10 @@ from pyspark.sql import functions as F, Window
 
 catalog = spark.conf.get("sentinelops.catalog")
 landing = spark.conf.get("sentinelops.osha_landing")
+# Later landing versions (comma-separated prefixes), e.g. osha_sir/v2 with stronger masking. Each is
+# its own append flow into Bronze, so the v1 flow and its checkpoint stay untouched; Silver keeps
+# the latest landed copy of each report.
+later_landings = [p.strip() for p in spark.conf.get("sentinelops.osha_landing_later", "").split(",") if p.strip()]
 FIELDS = ("report_id BIGINT, osha_id STRING, event_month STRING, state STRING, naics STRING, federal_state INT, "
           "hospitalized INT, amputation INT, loss_of_eye INT, inspected BOOLEAN, narrative STRING, "
           "nature_code STRING, nature_title STRING, body_part_code STRING, body_part_title STRING, "
@@ -26,16 +30,27 @@ def table(layer, name):
     return f"{catalog}.{layer}.{name}"
 
 
-@dp.table(name=table("bronze", "osha_sir_reports"))
-def raw_reports():
+def landed_reports(prefix):
     return (spark.readStream.format("cloudFiles").option("cloudFiles.format", "json")
             .schema(f"{FIELDS}, _rescued_data STRING")
             .option("rescuedDataColumn", "_rescued_data")
             .option("cloudFiles.allowOverwrites", "false")
             .option("pathGlobFilter", "*.jsonl")
-            .load(f"{landing}/reports")
+            .load(f"{prefix}/reports")
             .select("*", F.col("_metadata.file_path").alias("source_file"),
                     F.col("_metadata.file_modification_time").alias("source_modified_at")))
+
+
+@dp.table(name=table("bronze", "osha_sir_reports"))
+def raw_reports():
+    return landed_reports(landing)
+
+
+for later in later_landings:
+    # Flow names identify checkpoints: never rename one, and never reuse a name for another prefix.
+    @dp.append_flow(target=table("bronze", "osha_sir_reports"), name=f"osha_sir_{later.rstrip('/').rsplit('/', 1)[-1]}")
+    def later_reports(prefix=later):
+        return landed_reports(prefix)
 
 
 @dp.temporary_view(name="checked_reports")

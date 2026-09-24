@@ -73,3 +73,28 @@ def test_prepare_is_checksummed_and_immutable(tmp_path, monkeypatch):
     (source / osha.ARCHIVE).write_bytes(b"not the archive")
     with pytest.raises(ValueError, match="checksum"):
         osha.prepare(source, tmp_path / "other")
+
+
+def test_masking_v2_catches_shortened_employer_names_without_masking_ordinary_words():
+    common = frozenset({"power", "line", "beef", "packing", "cooler", "crew"})
+    # Eval v2's leak: the narrative used the first words of a longer legal name (fictional names here).
+    narrative = "An employee of Prairie Beef was hurt near the beef cooler."
+    employer = "Prairie Beef Packing Company, LLC"
+    assert osha.mask(narrative, employer, [])[0] == narrative  # masking v1 missed it
+    assert osha.mask(narrative, employer, [], common=common)[0] == \
+        "An employee of [EMPLOYER] was hurt near the beef cooler."
+    # Ordinary words in a name are masked only as a capitalized name, never as plain words.
+    assert osha.mask("The power line fell on a Power Line crew.", "Power Line Services Inc", [], common=common)[0] == \
+        "The power line fell on a [EMPLOYER] crew."
+    # A distinctive single word, a dba trading name, and a state name left alone.
+    assert osha.mask("A Zorbex worker fell.", "Zorbex Fresh Meats", [], common=common)[0] == "A [EMPLOYER] worker fell."
+    assert osha.mask("A cook at Joe's Diner was burned.", "Smith Holdings dba Joe's Diner", [], common=common)[0] == \
+        "A cook at [EMPLOYER] was burned."
+    assert osha.mask("In LaGrange, Georgia, a Georgia Power lineman fell.", "Georgia Power Company", [],
+                     common=common)[0] == "In LaGrange, Georgia, a [EMPLOYER] lineman fell."
+
+
+def test_common_words_count_lowercase_uses_only():
+    narratives = ["The auger caught him.", "An auger turned.", "Zorbex auger.", "Zorbex hired him."]
+    assert osha.common_words(narratives, 3) == frozenset({"auger"})  # "Zorbex" is never lowercase
+    assert osha.minimize(reports())[1]["masking_version"] == "v2"

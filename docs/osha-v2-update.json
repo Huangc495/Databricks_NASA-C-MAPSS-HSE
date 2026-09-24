@@ -1,0 +1,90 @@
+{
+  "pipeline_id": "7d53a0fb-d724-4628-a854-23dc1d0e283a",
+  "update_id": "5261ee72-b467-4954-8dbe-a9b63a74f243",
+  "state": "COMPLETED",
+  "flows": [
+    {
+      "flow": "sentinelops_dev.bronze.osha_sir_reports",
+      "refresh": "STREAMING_APPEND",
+      "output_rows": 0,
+      "data_quality": null
+    },
+    {
+      "flow": "sentinelops_dev.bronze.osha_sir_v2",
+      "refresh": "STREAMING_APPEND",
+      "output_rows": 105996,
+      "data_quality": null
+    },
+    {
+      "flow": "sentinelops_dev.gold.osha_documents",
+      "refresh": "ROW_BASED",
+      "output_rows": 105993,
+      "data_quality": {
+        "dropped_records": 0,
+        "warned_records": 0
+      }
+    },
+    {
+      "flow": "sentinelops_dev.silver.osha_incidents",
+      "refresh": "COMPLETE_RECOMPUTE",
+      "output_rows": 105993,
+      "data_quality": {
+        "dropped_records": 6,
+        "expectations": [
+          {
+            "dataset": "valid_reports",
+            "failed_records": 6,
+            "name": "has_narrative",
+            "passed_records": 211986
+          },
+          {
+            "dataset": "valid_reports",
+            "failed_records": 0,
+            "name": "valid_month",
+            "passed_records": 211992
+          },
+          {
+            "dataset": "valid_reports",
+            "failed_records": 0,
+            "name": "valid_naics",
+            "passed_records": 211992
+          },
+          {
+            "dataset": "valid_reports",
+            "failed_records": 0,
+            "name": "has_event_code",
+            "passed_records": 211992
+          },
+          {
+            "dataset": "valid_reports",
+            "failed_records": 0,
+            "name": "has_state",
+            "passed_records": 211992
+          },
+          {
+            "dataset": "valid_reports",
+            "failed_records": 0,
+            "name": "has_report_id",
+            "passed_records": 211992
+          },
+          {
+            "dataset": "valid_reports",
+            "failed_records": 0,
+            "name": "schema_conforms",
+            "passed_records": 211992
+          }
+        ],
+        "warned_records": 0
+      }
+    },
+    {
+      "flow": "sentinelops_dev.silver.osha_quarantine",
+      "refresh": "APPEND_ONLY",
+      "output_rows": 6,
+      "data_quality": {
+        "dropped_records": 0,
+        "warned_records": 0
+      }
+    }
+  ]
+}

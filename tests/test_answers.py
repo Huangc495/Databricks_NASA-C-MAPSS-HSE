@@ -4,8 +4,9 @@ import pandas as pd
 import pytest
 
 from sentinelops import answer_eval
-from sentinelops.answer_eval import (DEV, EVAL_V1, EVAL_V2, SETS, by_set, calibrate_threshold, collect, dataset,
-                                     decision_correct, decline_routes, fingerprint, summarize)
+from sentinelops.answer_eval import (DEV, EVAL_V1, EVAL_V2, EVAL_V3_IDENTITY, GENERAL_SETS, SETS, by_set,
+                                     calibrate_threshold, collect, dataset, decision_correct, decline_routes,
+                                     fingerprint, summarize)
 from sentinelops.answers import (ANSWERED, DECLINE_MARKER, DECLINED_BY_MODEL, DECLINED_LOW_SIMILARITY, ERROR,
                                  REJECTED_CITATIONS, Assistant, ChatClient, build_messages, check_citations,
                                  cited_ids, decline_message, message_text, normalize_citations, sentences)
@@ -157,10 +158,10 @@ def test_trace_has_retriever_documents_for_groundedness_judges():
 
 
 def test_question_sets_are_disjoint_labelled_and_fingerprinted():
-    ids = [q["id"] for q in DEV + EVAL_V1 + EVAL_V2]
+    ids = [q["id"] for q in DEV + EVAL_V1 + EVAL_V2 + EVAL_V3_IDENTITY]
     assert len(ids) == len(set(ids))
     seen = {q["question"] for q in DEV + RETRIEVAL_QUESTIONS + RETRIEVAL_OFF_TOPIC}
-    for questions in (EVAL_V1, EVAL_V2):  # each held-out set is new text, v2 also new to v1
+    for questions in (EVAL_V1, EVAL_V2, EVAL_V3_IDENTITY):  # each held-out set is new text
         texts = {q["question"] for q in questions}
         assert len(texts) == len(questions) and not texts & seen
         seen |= texts
@@ -170,15 +171,18 @@ def test_question_sets_are_disjoint_labelled_and_fingerprinted():
     # The Llama judge reads "A or B" as both required, so v2 facts are single claims.
     assert not [f for q in EVAL_V2 for f in q.get("facts", []) if " or " in f]
     assert len(dataset(DEV)) == len(DEV)
-    for questions in SETS.values():
-        counts = pd.Series([q["category"] for q in questions]).value_counts()
+    for name in GENERAL_SETS:
+        counts = pd.Series([q["category"] for q in SETS[name]]).value_counts()
         assert counts.min() >= 5 and len(counts) == 3
-    assert len(EVAL_V2) == 60 and answer_eval.HELD_OUT == "eval_v2"
+    # The identity set only asks who: every question must be declined.
+    assert {q["category"] for q in EVAL_V3_IDENTITY} == {answer_eval.UNANSWERABLE} and len(EVAL_V3_IDENTITY) == 16
+    assert all("identit" in q["missing"] for q in EVAL_V3_IDENTITY)
+    assert len(EVAL_V2) == 60 and answer_eval.HELD_OUT == "eval_v3_identity"
     assert len(fingerprint()) == 12
 
 
 def test_dataset_rows_carry_expectations_for_each_category():
-    assert {r["expectations"]["question_set"] for r in dataset()} == {"eval_v2"}
+    assert {r["expectations"]["question_set"] for r in dataset(EVAL_V2, "eval_v2")} == {"eval_v2"}
     rows = {r["expectations"]["question_id"]: r for r in dataset(EVAL_V1, "eval_v1")}
     assert rows["wood_chipper"]["expectations"]["question_set"] == "eval_v1"
     assert rows["wood_chipper"]["expectations"]["expected_facts"] and rows["wood_chipper"]["expectations"]["should_answer"]

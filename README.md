@@ -112,7 +112,10 @@ this timeout reduces exposure but is not a hard billing cap.
    questions (eval v2) gave 58/60 correct decisions. The model declined 20 of
    21 unanswerable questions that retrieval scored above the threshold.
    However, one answer named an employer whose shortened name had survived
-   masking, so deployment waits for stronger masking. The manual job
+   masking. Masking v2 (landing `osha_sir/v2`) now also masks shortened
+   employer names (capitalized leading-name leaks 37 → 0). After re-ingesting
+   and re-embedding the 140 changed documents, no employer name appeared in 76
+   answers, including 16 held-out identity requests. The manual job
    `osha_extraction_eval` codes narratives into event, nature, body part and
    source, scored against OSHA's codes (harmonized across OSHA's 2024 coding
    change). With no training labels, GPT-OSS-120B matches a supervised TF-IDF
