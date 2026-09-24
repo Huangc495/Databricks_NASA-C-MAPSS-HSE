@@ -1,19 +1,20 @@
 # Build status
 
-Last verified: September 24, 2026, 16:58 UTC (AI/BI dashboards, Genie and budget alert).
+Last verified: September 24, 2026, 18:40 UTC (real-time serving demo and answer evaluation v2).
 
 **At a glance.**
 
-- **Progress:** 25 of 38 tracked tasks are done. The real-time serving demo
-  is next; 10 tasks are not started and 2 are deferred.
+- **Progress:** 27 of 40 tracked tasks are done. Next is fixing the
+  employer-name masking gap that eval v2 found (needs your approval for a new
+  landing upload); 10 tasks are not started and 2 are deferred.
 - **Live state (read-only checks):** no active job runs, no classic clusters,
   no Vector Search or custom serving endpoints, and all pipelines IDLE. The
   starter warehouse is STOPPED (2X-Small, 5-minute auto-stop). `@champion` is
   v3 (READY).
-- **Cost:** September 24 has CAD 8.05 posted so far and is projected at about
-  CAD 10.6; see "Cost and runtime controls". Start the next billable task on
-  September 25 (UTC) or later.
-- **Git:** every milestone is committed on `main` (dashboards/Genie: `b94c34a`); there is no remote.
+- **Cost:** September 24 is projected at about CAD 12.6 (over CAD 10), after
+  the serving demo and eval v2 you approved against your credits, which
+  expire October 10. See "Cost and runtime controls".
+- **Git:** every milestone is committed on `main`; there is no remote.
 
 ## Task status
 
@@ -55,7 +56,7 @@ cost or prerequisites, with the reason given.
 | Delayed-label performance and age-matched drift monitoring | Done | `gold.cmapss_model_performance`, `gold.cmapss_feature_drift` |
 | Alerts on drift and performance tables | Done | Task `alerts` in `cmapss_retrain`: relative RMSE, age-matched PSI and freshness thresholds, logged to `gold.cmapss_alerts`; a breach fails the run (breach test run `955572570273055`). No email notification (your choice) |
 | Orchestrated retraining (ingest → verify → train → promote → score) | Done | Job `cmapss_retrain`; retrains only when the Gold training digests differ from the champion's. Unchanged-data run `599725542930474` SUCCESS in 23 min; `cmapss-retrain.json` |
-| Real-time serving demo with Gold-format features | **Next** | Bounded demo with scale-to-zero; needs your go-ahead on a serving endpoint; delete it afterwards |
+| Real-time serving demo with Gold-format features | Done | Champion v3 served with scale-to-zero: all 13,096 fleet rows bit-identical to the batch log; single-row p50 81 ms; inference table logged every request; endpoint deleted. [OPERATIONS.md](OPERATIONS.md#real-time-serving-bounded-demo), `serving-demo.json` |
 | Hyperparameter tuning, `mlflow.evaluate`, sequence baseline | Not started | |
 | Lakehouse Monitoring inference profile | Not started (optional) | Job-computed metrics already cover the demo |
 
@@ -70,27 +71,87 @@ cost or prerequisites, with the reason given.
 | Document embeddings (`osha_embed`) | Done | 105,993 vectors; `osha-embedding-backfill.json` |
 | Exact retrieval + code-based retrieval evaluation (1,024 vs 256 dimensions) | Done | Dense P@10 0.882 vs TF-IDF 0.786; 256 dims = 1,024 quality at 1/4 memory; `osha-retrieval-eval.json` |
 | Grounded answers with `[report_id]` citations, abstention, MLflow tracing | Done | GPT-OSS-120B over 256-dim retrieval; code-checked citations; threshold 0.6511 + model decline; `osha-answer-eval.json` |
-| LLM-judge evaluation (correctness, groundedness, relevance) | Done (28 held-out questions) | Llama 3.3 70B judge: 28/28 correct answer/decline decisions; on answers, correctness 11/12, groundedness 12/12. A larger set is still needed before deployment |
+| LLM-judge evaluation (correctness, groundedness, relevance) | Done (28 held-out questions) | Llama 3.3 70B judge: 28/28 correct answer/decline decisions; on answers, correctness 11/12, groundedness 12/12 |
+| Larger answer evaluation (eval v2) | Done (60 held-out questions) | 58/60 correct decisions; the model declined 20 of 21 unanswerable questions above the threshold. **One answer named an employer** (a masking gap); `osha-answer-eval-v2.json` |
+| Employer-name masking gap | **Next** | Shortened employer names survive in ~74–101 narratives. Stronger masking in a new landing version, re-ingest, re-embed changed documents; needs your approval for the upload |
 | Structured extraction scored against OSHA codes | Done | GPT-OSS-120B matches a supervised TF-IDF model on event, nature and body part (0.935/0.943/0.948) but trails on source (0.760 vs 0.825); `osha-extraction-eval.json` |
-| Agent deployment / review app | Deferred | Check serving cost first; scale-to-zero only |
+| Agent deployment / review app | Deferred | Blocked by the masking gap; then check serving cost, scale-to-zero only |
 
 ### Analytics and delivery
 
 | Task | Status | Evidence or next action |
 |---|---|---|
-| Unit tests (82) and local CI workflow file | Done (local) | `.github/workflows/ci.yml` has never run: no remote |
+| Unit tests (90) and local CI workflow file | Done (local) | `.github/workflows/ci.yml` has never run: no remote |
 | Git history | Done (local) | Branch `main`; no remote. Latest milestone commit `b94c34a` |
 | GitHub repository, CI runs, OIDC deployment to staging/prod | Not started | Needs your choice of repository and visibility |
 | AI/BI dashboards and Genie space | Done | Fleet health and Safety incidents dashboards, Genie space over 6 curated Gold tables, `analytics_refresh` job; Genie 7/8 held-out questions fully right (one miscounted summary); [ANALYTICS.md](ANALYTICS.md) |
 | SQL warehouse right-sizing | Done | Starter warehouse Small → 2X-Small, auto-stop 10 → 5 min (your approval); a wake-up now costs ~CAD 0.35, not ~2.3 |
 | Demo script and portfolio write-up | Not started | Last |
 
-Recommended order (details in HANDOVER.md section 3): serving demo → a larger
-answer evaluation, before any assistant deployment → API/streaming sources →
+Recommended order (details in HANDOVER.md section 3): fix the employer-name
+masking gap (before any assistant deployment) → API/streaming sources →
 environments and CI/CD → optional ML depth → demo script and write-up. The
-budget alert and dashboards/Genie are done.
+budget alert, dashboards/Genie, serving demo and eval v2 are done.
 
-## Current milestone: AI/BI dashboards, Genie and a budget alert
+## Current milestone: real-time serving demo and answer evaluation v2
+
+Both approved on September 24 (your credits last until October 10).
+
+**Real-time serving (bounded demo).** Details:
+[OPERATIONS.md](OPERATIONS.md#real-time-serving-bounded-demo); evidence
+[serving-demo.json](serving-demo.json).
+
+- **Endpoint** `sentinelops-rul-demo` served champion v3: Small CPU,
+  scale-to-zero, AI Gateway inference table. It was created at 17:16 UTC,
+  READY about 10 minutes later, and **deleted at 18:28**. It isn't a bundle
+  resource; its definition is `infra/serving-endpoint.json`.
+- **Parity job** `cmapss_serving_check` (`782318629064026`), run
+  `1018787913287976` **SUCCESS**:
+  - all **13,096** fleet rows of the Spark-computed Gold features, sent as
+    JSON, came back **bit-identical** to `gold.cmapss_predictions` for v3;
+  - latency: batches of 400 rows p50 250 ms; single rows p50 81 ms, p95 85
+    ms.
+- **Mistake, caught:** the first run (`959774648252926`) selected `cycle`
+  twice (it's a key and a feature). That shifted every request row by one
+  column, and the endpoint scored the misaligned rows without complaint. The
+  job then failed. It's fixed; `request_body` now rejects duplicate columns,
+  and a test covers it.
+- **Inference table** `sentinelops_dev.sentinelops_dev.turbofan_rul_demo_payload`:
+  every request was logged (86 rows, all status 200). Delivery took 5–40
+  minutes (standard, not fast-path), so the job's 3-minute check was too
+  short. The table is kept.
+
+**Answer evaluation v2.** Details: [SAFETY_RAG.md](SAFETY_RAG.md#larger-answer-evaluation-eval-v2);
+evidence [osha-answer-eval-v2.json](osha-answer-eval-v2.json).
+
+- **Scope:** 60 new held-out questions (24 answerable, 24 in-domain
+  unanswerable, 12 off-topic or adversarial). Prompt and threshold are
+  unchanged. Run `425541794390409` **SUCCESS** in 14.2 min.
+- **58/60 correct decisions.** 21 of 24 unanswerable questions scored above
+  the 0.6511 threshold, and the model declined 20 of them. All 4 in-domain
+  injection prompts passed the threshold, and the model declined each. On
+  answers, correctness was 22/23 and groundedness 23/23.
+- **Privacy failure:** "Which meatpacking plant had the ammonia leak ...?"
+  was answered with the report's own employer name. Masking had missed a
+  shortened form of the name; about 74–101 narratives are affected. The name
+  is redacted in the evidence. **Deployment stays blocked** until masking is
+  strengthened (the next task).
+- **Other misses:**
+  - one false decline, where retrieval found explosions for an
+    injection-injury question;
+  - one correctness miss, where the robbery reports retrieved were assaults,
+    not shootings.
+- **EVAL_V1 rerun (regression):** 28/28 decisions, correctness 12/12.
+- **Cost:**
+  - generation 0.262 DBU (≈ CAD 0.03);
+  - about 264 judge calls (≈ CAD 0.3–0.5);
+  - 14.2 min of serverless (≈ CAD 0.22).
+- **Tests:** 90 pass (8 new):
+  - serving: request exactness, duplicate columns, retries, parity, the
+    endpoint definition;
+  - question-set hygiene across v1 and v2, decline routes, results per set.
+
+## Earlier milestone: AI/BI dashboards, Genie and a budget alert
 
 Two AI/BI dashboards and a Genie space are now bundle resources. They are backed
 by two new Gold marts and checked on serverless compute before any warehouse
@@ -582,7 +643,7 @@ section is kept only so older links still resolve.
   | Day | Posted | By meter | Notes |
   |---|---|---|---|
   | September 23 | CAD 5.41 (final) | Serverless SQL 2.16, serverless jobs 1.85, NAT and IP 1.31 (19 h) | The projection of CAD 3–4 missed a Catalog Explorer browse at 19:23 UTC, which ran the Small warehouse for about 11 minutes (2.2 DBU) |
-  | September 24 | CAD 8.05 by 16:55 UTC (usage to ~11:00) | Serverless jobs 2.60, serverless SQL 2.42 (Catalog Explorer, 05:44), model calls 2.23, NAT and IP 0.76 | Projected ≈ CAD 10.6 after the remaining fixed cost (~0.9) and this milestone (~1.6): slightly over CAD 10, within USD 10 |
+  | September 24 | CAD 8.05 by 16:55 UTC (usage to ~11:00) | Serverless jobs 2.60, serverless SQL 2.42 (Catalog Explorer, 05:44), model calls 2.23, NAT and IP 0.76 | Projected ≈ CAD 12.6: the fixed remainder (~0.9), dashboards/Genie (~1.6), then the serving demo and eval v2 (~2.0: serving ≤0.35, jobs ~0.5, model calls ~0.4, warehouse checks ~0.7). Over CAD 10; you approved it against credits expiring October 10 |
 
 - **Rates** (Azure Retail Prices, `westus2`, CAD):
   - serverless jobs CAD 0.62/DBU (about 1.5 DBU per hour of job time);

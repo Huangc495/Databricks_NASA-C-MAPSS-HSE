@@ -101,17 +101,18 @@ resources:
               - mlflow==3.16.1
     # Manual only. Grounded answers with code-checked [report_id] citations and a calibrated
     # decline rule (GPT-OSS-120B over 256-dim exact retrieval), judged by Llama 3.3 70B on
-    # held-out questions. One MLflow trace per question; pay-per-token endpoints only.
+    # held-out questions (eval_v2; eval_v1 reruns as a regression set). One MLflow trace per
+    # question; pay-per-token endpoints only.
     osha_answer_eval:
       name: sentinelops-osha-answer-eval
       max_concurrent_runs: 1
-      timeout_seconds: 1500
+      timeout_seconds: 2700
       performance_target: STANDARD
       tasks:
         - task_key: evaluate
           max_retries: 0
           disable_auto_optimization: true
-          timeout_seconds: 1500
+          timeout_seconds: 2700
           spark_python_task:
             python_file: ../jobs/evaluate_answers.py
             parameters:
@@ -133,6 +134,8 @@ resources:
               - low
               - --workers
               - '2'
+              - --question-sets
+              - eval_v2,eval_v1
               - --job-run-id
               - '{{job.run_id}}'
               - --source-root

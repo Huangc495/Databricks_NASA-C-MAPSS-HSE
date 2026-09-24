@@ -4,8 +4,8 @@ import pandas as pd
 import pytest
 
 from sentinelops import answer_eval
-from sentinelops.answer_eval import (DEV, EVAL, calibrate_threshold, collect, dataset, decision_correct,
-                                     fingerprint, summarize)
+from sentinelops.answer_eval import (DEV, EVAL_V1, EVAL_V2, SETS, by_set, calibrate_threshold, collect, dataset,
+                                     decision_correct, decline_routes, fingerprint, summarize)
 from sentinelops.answers import (ANSWERED, DECLINE_MARKER, DECLINED_BY_MODEL, DECLINED_LOW_SIMILARITY, ERROR,
                                  REJECTED_CITATIONS, Assistant, ChatClient, build_messages, check_citations,
                                  cited_ids, decline_message, message_text, normalize_citations, sentences)
@@ -157,21 +157,30 @@ def test_trace_has_retriever_documents_for_groundedness_judges():
 
 
 def test_question_sets_are_disjoint_labelled_and_fingerprinted():
-    ids = [q["id"] for q in DEV + EVAL]
+    ids = [q["id"] for q in DEV + EVAL_V1 + EVAL_V2]
     assert len(ids) == len(set(ids))
-    texts = {q["question"] for q in EVAL}
-    assert not texts & {q["question"] for q in DEV + RETRIEVAL_QUESTIONS + RETRIEVAL_OFF_TOPIC}
-    for q in DEV + EVAL:
+    seen = {q["question"] for q in DEV + RETRIEVAL_QUESTIONS + RETRIEVAL_OFF_TOPIC}
+    for questions in (EVAL_V1, EVAL_V2):  # each held-out set is new text, v2 also new to v1
+        texts = {q["question"] for q in questions}
+        assert len(texts) == len(questions) and not texts & seen
+        seen |= texts
+    for q in DEV + EVAL_V1 + EVAL_V2:
         assert (q["category"] == answer_eval.ANSWERABLE) == bool(q.get("facts"))
         assert (q["category"] == answer_eval.UNANSWERABLE) == bool(q.get("missing"))
+    # The Llama judge reads "A or B" as both required, so v2 facts are single claims.
+    assert not [f for q in EVAL_V2 for f in q.get("facts", []) if " or " in f]
     assert len(dataset(DEV)) == len(DEV)
-    counts = pd.Series([q["category"] for q in EVAL]).value_counts()
-    assert counts.min() >= 5 and len(counts) == 3
+    for questions in SETS.values():
+        counts = pd.Series([q["category"] for q in questions]).value_counts()
+        assert counts.min() >= 5 and len(counts) == 3
+    assert len(EVAL_V2) == 60 and answer_eval.HELD_OUT == "eval_v2"
     assert len(fingerprint()) == 12
 
 
 def test_dataset_rows_carry_expectations_for_each_category():
-    rows = {r["expectations"]["question_id"]: r for r in dataset()}
+    assert {r["expectations"]["question_set"] for r in dataset()} == {"eval_v2"}
+    rows = {r["expectations"]["question_id"]: r for r in dataset(EVAL_V1, "eval_v1")}
+    assert rows["wood_chipper"]["expectations"]["question_set"] == "eval_v1"
     assert rows["wood_chipper"]["expectations"]["expected_facts"] and rows["wood_chipper"]["expectations"]["should_answer"]
     assert rows["sue_employer"]["expectations"]["missing"] == "legal advice"
     assert rows["sue_employer"]["expectations"]["expected_response"] == answer_eval.DECLINE_RESPONSE
@@ -221,3 +230,20 @@ def test_collect_reads_evaluate_results_and_counts_failed_predictions_as_errors(
     assert first["answer"] == "A [1]." and first["status"] == ANSWERED and first["input_tokens"] == 7
     assert first["judges"] == {"correctness": "yes", "retrieval_groundedness": None}
     assert second["status"] == ERROR and second["answer"] is None and second["judges"]["retrieval_groundedness"] == "yes"
+
+
+def test_decline_routes_separate_threshold_declines_from_model_declines():
+    rows = [{"question_id": "u1", "category": "unanswerable", "status": DECLINED_LOW_SIMILARITY, "top1_score": 0.60},
+            {"question_id": "u2", "category": "unanswerable", "status": DECLINED_BY_MODEL, "top1_score": 0.70},
+            {"question_id": "u3", "category": "unanswerable", "status": ANSWERED, "top1_score": 0.66},
+            {"question_id": "o1", "category": "off_topic", "status": DECLINED_LOW_SIMILARITY, "top1_score": 0.40},
+            {"question_id": "a1", "category": "answerable", "status": ANSWERED, "top1_score": 0.80}]
+    routes = decline_routes(rows, 0.65)
+    assert routes["unanswerable"] == {"questions": 3, "below_threshold": 1, "above_threshold": 2,
+                                      "above_threshold_declined_by_model": 1, "answered_wrongly": ["u3"],
+                                      "within_0_02_of_threshold": ["u3"]}
+    assert routes["off_topic"]["below_threshold"] == 1 and "answerable" not in routes
+    split = by_set([{**r, "question_set": "eval_v2"} for r in rows[:3]] + [{**rows[4], "question_set": "eval_v1"}], 0.65)
+    assert list(split) == ["eval_v2", "eval_v1"]
+    assert split["eval_v2"]["summary"]["unanswerable"]["wrong_decisions"] == ["u3"]
+    assert split["eval_v1"]["summary"]["answerable"]["decision_accuracy"] == 1.0

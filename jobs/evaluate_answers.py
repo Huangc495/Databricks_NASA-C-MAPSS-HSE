@@ -2,7 +2,8 @@
 
 Loads the 256-dimension exact index once (current vectors only) and embeds every question
 once with ai_query. It calibrates the similarity threshold on questions that are not
-evaluated, then runs mlflow.genai.evaluate on the held-out EVAL set. GPT-OSS-120B answers with
+evaluated, then runs mlflow.genai.evaluate on the chosen question sets: the held-out EVAL_V2
+and, as a regression check, EVAL_V1 (held out until its first run). Results are reported per set. GPT-OSS-120B answers with
 [report_id] citations that code checks; a Llama 3.3 judge (a different model family) scores
 correctness, groundedness and relevance. Every question is one MLflow trace.
 """
@@ -22,6 +23,7 @@ parser.add_argument("--k", type=int, required=True)
 parser.add_argument("--max-tokens", type=int, required=True)
 parser.add_argument("--reasoning-effort", required=True)
 parser.add_argument("--workers", type=int, required=True)
+parser.add_argument("--question-sets", required=True, help="Comma-separated names from answer_eval.SETS")
 parser.add_argument("--job-run-id", required=True)
 parser.add_argument("--source-root", required=True)
 args = parser.parse_args()
@@ -42,6 +44,7 @@ if not re.fullmatch(r"[a-zA-Z_][a-zA-Z0-9_]*", args.catalog) or not all(re.fullm
     raise ValueError("Catalog must be a simple identifier and endpoints serving endpoint names")
 if not re.fullmatch(r"[0-9]+", args.job_run_id) or args.reasoning_effort not in ("low", "medium", "high"):
     raise ValueError("Job run ID must be numeric and reasoning effort low, medium or high")
+sets = {name: answer_eval.SETS[name] for name in args.question_sets.split(",")}  # KeyError on unknown names
 
 started = time.monotonic()
 spark = SparkSession.builder.getOrCreate()
@@ -67,7 +70,7 @@ def dev(category):
 on_topic = [q["question"] for q in retrieval_eval.QUESTIONS] + dev(answer_eval.ANSWERABLE)
 off_topic = [q["question"] for q in retrieval_eval.OFF_TOPIC] + dev(answer_eval.OFF_TOPIC)
 dev_unanswerable = dev(answer_eval.UNANSWERABLE)
-eval_questions = [q["question"] for q in answer_eval.EVAL]
+eval_questions = [q["question"] for questions in sets.values() for q in questions]
 asked = list(dict.fromkeys(on_topic + off_topic + dev_unanswerable + eval_questions))
 query_frame = spark.createDataFrame([(i, format_query(q)) for i, q in enumerate(asked)], "i INT, text STRING")
 embedded = {row.i: row.e for row in query_frame.selectExpr("i", f"ai_query('{args.embedding_endpoint}', text) AS e").collect()}
@@ -101,29 +104,33 @@ with mlflow.start_run(run_name=f"answer-eval-{answer_eval.VERSION}") as run:
                        "dimensions": args.dimensions, "k": args.k, "max_tokens": args.max_tokens,
                        "reasoning_effort": args.reasoning_effort, "temperature": 0.0, "min_score": threshold,
                        "documents": len(frame), "questions": len(eval_questions), "workers": args.workers,
+                       "question_sets": args.question_sets,
                        "job_run_id": args.job_run_id})
     mlflow.log_text(SYSTEM_PROMPT, "system_prompt.txt")
     mlflow.log_dict(calibration, "calibration.json")
     eval_started = time.monotonic()
-    result, rows = answer_eval.evaluate_assistant(assistant, answer_eval.EVAL, judge_model=f"databricks:/{args.judge_endpoint}",
+    result, rows = answer_eval.evaluate_assistant(assistant, sets, judge_model=f"databricks:/{args.judge_endpoint}",
                                                   workers=args.workers)
     eval_seconds = time.monotonic() - eval_started
-    summary = answer_eval.summarize(rows)
+    summary = answer_eval.summarize(rows)  # all sets together, for token totals and cost
+    results_by_set = answer_eval.by_set(rows, threshold)
     generation_dbus = (summary["overall"]["input_tokens"] * DBU_PER_MILLION_TOKENS["input"]
                        + summary["overall"]["output_tokens"] * DBU_PER_MILLION_TOKENS["output"]) / 1e6
-    mlflow.log_metrics({f"{group}_{name}": float(value) for group, values in summary.items()
+    mlflow.log_metrics({f"{set_name}_{group}_{name}": float(value) for set_name, result_set in results_by_set.items()
+                        for group, values in result_set["summary"].items()
                         for name, value in values.items() if isinstance(value, (int, float))})
     mlflow.log_metrics({"min_score": threshold, "generation_dbus": generation_dbus, "index_load_seconds": load_seconds,
                         "evaluate_seconds": eval_seconds})
-    per_question = [{key: row[key] for key in ("question_id", "category", "status", "top1_score", "judges", "answer",
-                                               "trace_id")}
+    per_question = [{key: row[key] for key in ("question_set", "question_id", "category", "status", "top1_score",
+                                               "judges", "answer", "trace_id")}
                     | {"cited_ids": (row["citations"] or {}).get("cited_ids"),
                        "coverage": (row["citations"] or {}).get("coverage")} for row in rows]
     report = {"mlflow_run_id": run.info.run_id, "eval_fingerprint": answer_eval.fingerprint(),
               "prompt_version": PROMPT_VERSION, "documents": len(frame), "index_mb": round(index.megabytes, 1),
-              "calibration": calibration, "summary": summary, "generation_dbus": round(generation_dbus, 5),
+              "calibration": calibration, "held_out_set": answer_eval.HELD_OUT, "by_set": results_by_set,
+              "overall": summary["overall"], "generation_dbus": round(generation_dbus, 5),
               "seconds": {"index_load": round(load_seconds, 1), "evaluate": round(eval_seconds, 1),
                           "total": round(time.monotonic() - started, 1)},
-              "per_question": sorted(per_question, key=lambda r: (r["category"], r["question_id"]))}
+              "per_question": sorted(per_question, key=lambda r: (r["question_set"], r["category"], r["question_id"]))}
     mlflow.log_dict(report, "answer_report.json")
 print(json.dumps(report, default=str))

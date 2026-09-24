@@ -85,12 +85,19 @@ this timeout reduces exposure but is not a hard billing cap.
 
 ## Next milestones
 
-1. Real-time serving demo. Batch operations are in place: validation-gated
-   promotion (v3 is `@champion`), idempotent fleet scoring into
-   `gold.cmapss_predictions`, and delayed-label performance plus age-matched
-   drift monitoring. The manual job `cmapss_retrain` chains ingest → verify →
-   train (only when Gold training data changed) → promote → score → monitor →
-   threshold alerts. See [docs/OPERATIONS.md](docs/OPERATIONS.md).
+1. Operational ML. Done:
+   - validation-gated promotion (v3 is `@champion`);
+   - idempotent fleet scoring into `gold.cmapss_predictions`;
+   - delayed-label performance and age-matched drift monitoring;
+   - the manual job `cmapss_retrain`, which chains ingest → verify → train
+     (only when Gold training data changed) → promote → score → monitor →
+     threshold alerts;
+   - a bounded real-time serving demo: champion v3 on a scale-to-zero
+     endpoint. All 13,096 fleet rows came back bit-identical to the batch
+     predictions (single-row p50 81 ms), and an inference table logged every
+     request. The endpoint was deleted afterwards.
+
+   See [docs/OPERATIONS.md](docs/OPERATIONS.md).
 2. Extend training beyond FD001 using the existing composite keys.
 3. Safety assistant over OSHA Severe Injury Reports. Done: provenance, a
    privacy-minimized landing, the `osha_safety` pipeline to Gold (105,993
@@ -101,7 +108,11 @@ this timeout reduces exposure but is not a hard billing cap.
    reports can't answer. The manual job `osha_answer_eval` traces every
    question in MLflow. On 28 held-out questions it made 28/28 correct
    answer/decline decisions; a Llama 3.3 judge passed 11/12 answers for
-   correctness and 12/12 for groundedness. The manual job
+   correctness and 12/12 for groundedness. A larger held-out set of 60
+   questions (eval v2) gave 58/60 correct decisions. The model declined 20 of
+   21 unanswerable questions that retrieval scored above the threshold.
+   However, one answer named an employer whose shortened name had survived
+   masking, so deployment waits for stronger masking. The manual job
    `osha_extraction_eval` codes narratives into event, nature, body part and
    source, scored against OSHA's codes (harmonized across OSHA's 2024 coding
    change). With no training labels, GPT-OSS-120B matches a supervised TF-IDF

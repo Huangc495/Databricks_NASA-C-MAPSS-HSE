@@ -1,6 +1,6 @@
 # SentinelOps — handover for the next session
 
-Last updated: September 24, 2026, 17:00 UTC. Git `main` holds every milestone
+Last updated: September 24, 2026, 18:45 UTC. Git `main` holds every milestone
 so far, including dashboards/Genie (commit `b94c34a`); there is no remote. See
 section 6.
 
@@ -24,6 +24,14 @@ Databricks, and every job is manual, bounded and verified.
   - Structured extraction scored against harmonized OSHA codes. GPT-OSS-120B
     matches a supervised TF-IDF model on three fields but trails on source
     (0.760 vs 0.825).
+  - Eval v2, 60 new held-out questions: 58/60 correct decisions. The model
+    declined 20 of 21 unanswerable questions scored above the threshold.
+    **One answer named an employer**, because masking missed shortened
+    employer names (about 74–101 narratives). Deployment is blocked until
+    that's fixed.
+- **Real-time serving (bounded demo, deleted):** champion v3 on a
+  scale-to-zero endpoint. All 13,096 fleet rows came back bit-identical to the
+  batch log, and an inference table logged every request.
 - **Self-service analytics:**
   - Two AI/BI dashboards (Fleet health, Safety incidents) and one Genie space,
     all bundle resources.
@@ -36,7 +44,7 @@ Databricks, and every job is manual, bounded and verified.
   - Budget `sentinelops-dev-monthly`: CAD 150/month, with email alerts.
   - The starter warehouse is now 2X-Small with a 5-minute auto-stop.
 - **What's left is in section 3**, in the recommended order. The next task is
-  the real-time serving demo. It creates a serving endpoint, so ask first.
+  the employer-name masking fix. It needs a new landing upload, so ask first.
 
 The authoritative task tracker is the **Task status** table at the top of
 [docs/STATUS.md](docs/STATUS.md). Update it as work lands.
@@ -55,7 +63,7 @@ The authoritative task tracker is the **Task status** table at the top of
 ```powershell
 . ./scripts/Use-SentinelOps.ps1
 az account show --query '{name:name,id:id,user:user.name}' -o json
-.venv/Scripts/python.exe -m pytest -q                      # expect 82 passed
+.venv/Scripts/python.exe -m pytest -q                      # expect 90 passed
 .tools/databricks/databricks.exe bundle validate --strict -t dev
 .tools/databricks/databricks.exe jobs list-runs --active-only -o json
 .tools/databricks/databricks.exe clusters list -o json
@@ -66,8 +74,9 @@ az account show --query '{name:name,id:id,user:user.name}' -o json
 
 3. Check posted costs before any compute. Billing lags about 9 hours, and
    an empty or low number is **not** proof of low spend. September 24 (UTC)
-   was projected at about CAD 10.6, just over CAD 10 (see the STATUS
-   milestone), so start new billable work on September 25 or later.
+   is projected at about CAD 12.6. The user approved going over CAD 10
+   because their Azure credits last until October 10, 2026. Still state costs
+   and ask per billable resource.
 
 ```powershell
 az rest --method post --url 'https://management.azure.com/subscriptions/b1026367-46bf-43e0-93b5-bbfcc45a2291/providers/Microsoft.CostManagement/query?api-version=2023-03-01' --body '@infra/cost-query.json' --query properties.rows -o json
@@ -77,7 +86,9 @@ az rest --method post --url 'https://management.azure.com/subscriptions/b1026367
 
 - The user authorized Azure work under `cheng.huang.ca@outlook.com` with a
   budget of **up to $10/day** for the whole demo (treated as CAD, the
-  conservative reading). There is no hard cutoff. Budget
+  conservative reading). On September 24 they added that they have Azure
+  credits until **October 10, 2026**, so approved tasks needn't wait for the
+  next UTC day. There is no hard cutoff. Budget
   `sentinelops-dev-monthly` (CAD 150/month on both resource groups) emails at
   50%, 80% and 100% of actual spend and at 100% of forecast. About CAD 1.7/day is fixed (the managed resource group's NAT gateway
   and public IP bill 24/7). Serverless jobs cost ~CAD 0.62/DBU, roughly 1.5 DBU
@@ -114,17 +125,18 @@ front.
 
 | # | Task | Approval needed | Cost character |
 |---|---|---|---|
-| 2 | Real-time serving demo (C-MAPSS champion) | Yes: a serving endpoint | Bills while provisioned; scale-to-zero; delete afterwards |
-| 3 | Larger answer evaluation, then (optionally) agent deployment and review app | Deployment: yes | Evaluation: pay-per-token cents. Deployment: serving endpoint |
+| 3 | Employer-name masking fix, then (optionally) agent deployment and review app | Yes: new landing upload; deployment: a serving endpoint | Cents: serverless ingest, re-embedding ~100 documents, a held-out identity check. Deployment: serving endpoint |
 | 4 | REST API ingestion (for example weather or energy JSON) | Yes: new external data source and download | Serverless job minutes |
 | 5 | Event Hubs (Kafka endpoint) streaming demo | Yes: namespace bills while it exists | Hourly namespace cost; delete afterwards |
 | 6 | Environments and CI/CD: dev/staging/prod catalogs, service principals, `run_as`, secrets, GitHub + OIDC | Yes: repository and visibility, grants, principals | Mostly free |
 | 7 | Optional ML depth: FD002–FD004, hyperparameter tuning, `mlflow.evaluate`, a sequence baseline, Lakehouse Monitoring | Only if it adds billable resources | Serverless job minutes |
 | 8 | Demo script and portfolio write-up | No (publishing anything externally: yes) | Free |
 
-Done since the last handover: **0. the budget alert** and **1. the AI/BI
-dashboards and Genie space** (see `docs/ANALYTICS.md` and the STATUS
-milestone). Open follow-ups from task 1, all optional:
+Done since the last handover: **0. the budget alert**, **1. the AI/BI
+dashboards and Genie space** (`docs/ANALYTICS.md`), **2. the real-time
+serving demo** (`docs/OPERATIONS.md`, "Real-time serving"), and **3a. the
+larger answer evaluation** (`docs/SAFETY_RAG.md`, "Larger answer evaluation").
+See the STATUS milestones. Open follow-ups from task 1, all optional:
 
 - Screenshots for the write-up. The in-app browser can't save them; ask the
   user to capture them, or use Claude in Chrome if it's connected.
@@ -135,27 +147,37 @@ milestone). Open follow-ups from task 1, all optional:
 - Add `analytics_refresh` as a final task of `cmapss_retrain`, so
   `cmapss_fleet_status` can't go stale after a promotion.
 
-### 2. Real-time serving demo (next)
+### 3. Employer-name masking fix (next), then deployment
 
-- Serve `@champion` (v3) from Model Serving with **scale-to-zero**, as a
-  bounded demo. Delete the endpoint afterwards and confirm in the inventory.
-- **Input contract:** Gold-format feature rows computed by Spark, never
-  pandas-recomputed features (a ~1e-12 difference moves gradient-boosting
-  results). `docs/OPERATIONS.md` ("Serving") describes the options.
-- **Proof:** endpoint predictions for fleet rows must equal the batch
-  predictions in `gold.cmapss_predictions` for v3, bit-for-bit or within a
-  stated tolerance. Consider inference tables only if the cost is clear.
+Eval v2 found that the assistant named an employer. `sentinelops.osha.mask`
+masks each report's full employer name, and the name with suffixes such as
+"Inc." removed, but not shortened forms: the narrative used the first words
+of a longer legal name. A local count finds 74–101 of 105,996 narratives
+still containing part of their own employer's name. Plan:
 
-### 3. Answer evaluation at scale, then deployment
+1. **DEV first.** Extend the masking, for example to leading word sequences
+   of the employer name that aren't generic words. Measure it on the local
+   raw archive; it stays local.
+   - Report the before/after leak count.
+   - Report over-masking (common words wrongly masked).
+2. **Write a new landing version** `osha_sir/v2` with the same schema, and
+   upload it with the user's approval. Never overwrite `v1`. The Silver rule
+   "latest landed copy wins" replaces the affected reports.
+   - Check how the pipeline's landing path handles a new version (it points
+     at `.../osha_sir/v1`); a configuration change may be cleaner.
+3. `osha_embed` re-embeds only documents whose hash changed (about 100;
+   cents). Rerun `analytics_refresh` for the facts table.
+4. **New held-out identity questions** (not EVAL_V2's ammonia question,
+   which is now known) that ask about employers in reports known to have had
+   leaks. Consider a code-side second layer: reject any answer that repeats a
+   string masked in its cited reports.
+5. Only then: Agent Framework deployment and a review app (scale-to-zero,
+   serving cost checked first, the user's approval).
 
-- Before any deployment, extend `sentinelops.answer_eval` with more held-out
-  questions, especially in-domain unanswerable ones near the 0.6511 threshold
-  (it caught 5 of 11 such questions, one by only 0.0016).
-- Keep the dev/held-out discipline: tune only on DEV, and run EVAL once, in
-  the job.
-- Agent Framework deployment and review app: check serving cost first,
-  scale-to-zero only, and get the user's approval. Consider Unity Catalog trace
-  storage only if a SQL warehouse is acceptable.
+Other eval v2 follow-ups, both optional:
+
+- The retrieval miss on injection injuries.
+- The robbery answer-key mismatch.
 
 ### 4–5. New sources
 
@@ -189,6 +211,14 @@ milestone). Open follow-ups from task 1, all optional:
   SAFETY_RAG.
 
 ### What exists (reuse, don't rebuild)
+
+- **Serving:** `infra/serving-endpoint.json` recreates the demo endpoint. The
+  job `cmapss_serving_check` proves bit-identical parity with the batch log,
+  measures latency and checks the inference table; its 3-minute table wait is
+  too short, so check the table later.
+- **Answer evaluation:** `answer_eval.SETS` holds `eval_v2` (held out, now
+  used) and `eval_v1` (regression). The job takes `--question-sets`. A new
+  held-out set needs a new list, never edits to a used one.
 
 - **Analytics:** job `analytics_refresh` (manual; run it after `osha_ingest` or
   `cmapss_retrain`) rebuilds `gold.osha_injury_facts` and
@@ -258,6 +288,11 @@ milestone). Open follow-ups from task 1, all optional:
 | Genie summary numbers | It miscounted 43 listed rows (21 vs 20). Give example SQL that aggregates (`count_if`), and check its SQL results, not its prose |
 | Every deploy "updates" three jobs | `cmapss_ingest`, `osha_ingest` and `cmapss_retrain` resend identical settings (the API doesn't echo `disable_auto_optimization` on pipeline tasks); harmless. `bundle deploy --select <resource>` deploys one resource |
 | Browser checks of the workspace | The in-app browser needs the user to sign in, and it can't save screenshots or zoom. Record render checks as text and JSON |
+| `cycle` is both a Gold key and a model feature | `select(*KEYS, *FEATURES)` repeats it and shifts every value after it. The serving endpoint scored such rows without error, because the types matched. Select features without the keys, and reject duplicate columns (`serving.request_body` does) |
+| Serving endpoint provisioning | About 10 minutes from create to READY, mostly the container build. Scale-to-zero stops billing after 30 idle minutes |
+| AI Gateway inference table on a CPU custom model | Standard delivery took 5–40 minutes (no `_otel_logs`, so not the fast path). Check it later rather than in the same job |
+| Employer names in narratives | Masking full names isn't enough: shortened forms survived in ~0.1% of narratives, and the assistant repeated one. Scan answers against the raw employer list locally before trusting identity declines |
+| Threshold vs model declines | Questions phrased like incidents score above the threshold (21 of 24 in eval v2), and so did in-domain prompt injections. The model's decline is the real defense; test it with such questions |
 
 ## 5. Resources
 
@@ -288,6 +323,9 @@ with the CLI (`infra/uc-*.json`). Bundle `sentinelops`, target `dev`.
 | job `analytics_refresh` | `847239470140874` | Analytics marts, comments, dashboard/Genie SQL checks (run `429694746857912`) |
 | dashboard `fleet_health` / `safety_incidents` | `01f1b83350951effa1d1f1bc6ca9e6cd` / `01f1b83350861a42888ebab34d8a8785` | AI/BI dashboards, published with viewer credentials |
 | genie space `sentinelops_operations` | `01f1b8347de912dc8d94fcb07a9144ec` | Genie over 6 curated Gold tables |
+| job `cmapss_serving_check` | `782318629064026` | Serving parity check (run `1018787913287976`; failed first run `959774648252926`) |
+| serving endpoint `sentinelops-rul-demo` | deleted 2026-09-24 18:28 UTC | Bounded demo from `infra/serving-endpoint.json`; inference table `sentinelops_dev.sentinelops_dev.turbofan_rul_demo_payload` kept |
+| job `osha_answer_eval` eval v2 | run `425541794390409` | 60 held-out + 28 regression questions; MLflow `cf0414dbda1c45dc9832fd9640efddff` |
 
 All jobs are manual, STANDARD, one concurrent run, zero retries (including
 serverless auto-optimization retries), with timeouts and no schedules. Azure
