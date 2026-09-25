@@ -95,6 +95,15 @@ def test_each_deploy_uses_its_targets_principal_and_prod_waits_for_staging():
         "databricks bundle validate --strict -t prod", "databricks bundle deploy -t prod"]
 
 
+def test_only_a_manual_run_can_let_staging_recreate_data_assets():
+    switch = TRIGGERS["workflow_dispatch"]["inputs"]["allow_staging_recreate"]
+    assert switch["type"] == "boolean" and switch["default"] is False
+    steps = [(name, step.get("run", "")) for name, job in JOBS.items() for step in job["steps"]]
+    approving = [(name, run) for name, run in steps if "auto-approve" in run]
+    assert approving == [("staging", "databricks bundle deploy -t staging ${{ github.event_name == 'workflow_dispatch' "
+                                     "&& inputs.allow_staging_recreate && '--auto-approve' || '' }}")]
+
+
 def load_uploader():
     spec = importlib.util.spec_from_file_location("upload_landing", ROOT / "scripts/upload_landing.py")
     module = importlib.util.module_from_spec(spec)

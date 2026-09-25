@@ -9,6 +9,13 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      allow_staging_recreate:
+        description: >-
+          Let this run's staging deploy delete or recreate schemas and volumes (--auto-approve).
+          Read the plan in the failed run first. Pushes can't set this, and prod never uses it.
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -76,7 +83,9 @@ jobs:
           path: data/cmapss/CMAPSSData.zip
           key: cmapss-md5-79a22f36e80606c69d0e9e4da5bb2b7a
       - run: databricks bundle validate --strict -t staging
-      - run: databricks bundle deploy -t staging
+      # A deploy that would delete or recreate schemas or volumes stops here, unless a manual run
+      # explicitly allows it.
+      - run: databricks bundle deploy -t staging ${{ github.event_name == 'workflow_dispatch' && inputs.allow_staging_recreate && '--auto-approve' || '' }}
       # The NASA archive is MD5-checked, the landing files are prepared deterministically, and
       # files already in the volume must be identical: reruns upload nothing.
       - run: python -m sentinelops.landing
