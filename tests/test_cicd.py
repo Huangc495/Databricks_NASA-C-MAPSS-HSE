@@ -1,7 +1,9 @@
+import fnmatch
 import importlib.util
 import io
 from pathlib import Path
 import re
+import subprocess
 
 import pytest
 import yaml
@@ -24,11 +26,23 @@ def test_each_environment_has_its_own_catalog_and_principal():
     catalogs = {t: BUNDLE["targets"][t].get("variables", {}).get("catalog", BUNDLE["variables"]["catalog"]["default"])
                 for t in ("dev", "staging", "prod")}
     assert catalogs == {"dev": "sentinelops_dev", "staging": "sentinelops_staging", "prod": "sentinelops_prod"}
-    for target in (staging, prod):
+    for name, target in (("staging", staging), ("prod", prod)):
         assert {"user_name": "cheng.huang.ca@outlook.com", "level": "CAN_MANAGE"} in target["permissions"]
+        # The principal owns its bundle folder; strict validation fails unless the bundle says so.
+        assert {"service_principal_name": run_as(name), "level": "CAN_MANAGE"} in target["permissions"]
+        assert target["presets"]["name_prefix"] == f"[{name}] "
     script = (ROOT / "scripts/setup_environment_catalogs.py").read_text()
     for target, catalog in (("staging", "sentinelops_staging"), ("prod", "sentinelops_prod")):
         assert re.search(rf'"{catalog}": \("{target}", "{run_as(target)}"\)', script)
+
+
+def test_every_sync_pattern_matches_a_tracked_file():
+    # CI deploys from a clean checkout, where a pattern matching nothing (say, a git-ignored
+    # directory) is a warning, and strict validation fails on warnings.
+    tracked = subprocess.run(["git", "ls-files"], cwd=ROOT, capture_output=True, text=True, check=True).stdout.split()
+    for kind, patterns in BUNDLE["sync"].items():
+        for pattern in patterns:
+            assert any(fnmatch.fnmatch(path, pattern.replace("**", "*")) for path in tracked), (kind, pattern)
 
 
 def test_environment_resources_create_schemas_before_pipelines_use_them():

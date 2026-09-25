@@ -14,15 +14,13 @@ variables:
     description: SQL warehouse for AI/BI dashboards and Genie (2X-Small, 5-minute auto-stop)
     lookup:
       warehouse: Serverless Starter Warehouse
+# data/, artifacts/ and .venv/ are git-ignored, which sync already skips. Every pattern here must
+# match a tracked file: in CI's clean checkout, a pattern that matches nothing is a strict-mode error.
 sync:
   include:
     - src/**
     - jobs/**
     - pipelines/**
-  exclude:
-    - data/**
-    - artifacts/**
-    - .venv/**
 targets:
   dev:
     default: true
@@ -42,8 +40,13 @@ targets:
     variables:
       catalog: sentinelops_staging
       schema: sentinelops
+    presets:
+      name_prefix: '[staging] '
+    # The deploying principal owns its bundle folder; strict validation wants that stated here.
     permissions:
       - user_name: cheng.huang.ca@outlook.com
+        level: CAN_MANAGE
+      - service_principal_name: 02bece01-ccd7-4130-8e8d-c8de43583e41
         level: CAN_MANAGE
   prod:
     mode: production
@@ -54,6 +57,11 @@ targets:
     variables:
       catalog: sentinelops_prod
       schema: sentinelops
+    presets:
+      name_prefix: '[prod] '
+    # The deploying principal owns its bundle folder; strict validation wants that stated here.
     permissions:
       - user_name: cheng.huang.ca@outlook.com
+        level: CAN_MANAGE
+      - service_principal_name: 5d729946-2748-48f4-9300-ba9a559bf93d
         level: CAN_MANAGE
