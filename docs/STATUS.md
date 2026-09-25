@@ -1,6 +1,6 @@
 # Build status
 
-Last verified: September 24, 2026, 23:55 UTC (REST API ingestion, Open-Meteo weather).
+Last verified: September 25, 2026, 02:05 UTC (REST API ingestion, Open-Meteo weather; committed as `abbba3b`).
 
 **At a glance.**
 
@@ -16,7 +16,8 @@ Last verified: September 24, 2026, 23:55 UTC (REST API ingestion, Open-Meteo wea
   earlier ~13.4 plus the REST API milestone (~1). The serving demo, eval v2,
   masking v2 and the weather backfill were approved against your credits,
   which expire October 10. See "Cost and runtime controls".
-- **Git:** every milestone is committed on `main`; there is no remote.
+- **Git:** every milestone is committed on `main` (latest `abbba3b`, REST API
+  ingestion); there is no remote.
 
 ## Task status
 
@@ -98,9 +99,9 @@ eval v2, masking v2 and REST API ingestion are done.
 ## Current milestone: REST API ingestion (Open-Meteo weather)
 
 A third ingestion style, next to files: a REST API fetched into immutable
-landing, then Auto Loader into Bronze/Silver/Gold. Details:
-[INGESTION.md](INGESTION.md#rest-api-ingestion-open-meteo-weather); evidence
-[weather-backfill.json](weather-backfill.json).
+landing, then Auto Loader into Bronze/Silver/Gold. Committed as `abbba3b`.
+Details: [INGESTION.md](INGESTION.md#rest-api-ingestion-open-meteo-weather);
+evidence [weather-backfill.json](weather-backfill.json).
 
 - **Source (your choice):** the Open-Meteo Historical Weather API. It needs no
   key; data is CC BY 4.0 ("Weather data by Open-Meteo.com", ERA5 from
@@ -748,7 +749,7 @@ section is kept only so older links still resolve.
   | Day | Posted | By meter | Notes |
   |---|---|---|---|
   | September 23 | CAD 5.41 (final) | Serverless SQL 2.16, serverless jobs 1.85, NAT and IP 1.31 (19 h) | The projection of CAD 3–4 missed a Catalog Explorer browse at 19:23 UTC, which ran the Small warehouse for about 11 minutes (2.2 DBU) |
-  | September 24 | CAD 8.05 by 16:55 UTC (usage to ~11:00) | Serverless jobs 2.60, serverless SQL 2.42 (Catalog Explorer, 05:44), model calls 2.23, NAT and IP 0.76 | Projected ≈ CAD 13.4: the fixed remainder (~0.9), dashboards/Genie (~1.6), the serving demo and eval v2 (~2.0: serving ≤0.35, jobs ~0.5, model calls ~0.4, warehouse checks ~0.7), then masking v2 (~0.8). Over CAD 10; you approved it against credits expiring October 10. Then the weather backfill (21:51–23:50 UTC, ~CAD 0.7–1.1), so ≈ CAD 14.5. CAD 8.86 had posted by 23:55 UTC. The Cost Management API returns 429 in bursts, so recheck later |
+  | September 24 | CAD 11.65 by 02:05 UTC on September 25 (usage to ~17:00) | At the 8.05 posted by 16:55 UTC: serverless jobs 2.60, serverless SQL 2.42 (Catalog Explorer, 05:44), model calls 2.23, NAT and IP 0.76 | Projected ≈ CAD 13.4: the fixed remainder (~0.9), dashboards/Genie (~1.6), the serving demo and eval v2 (~2.0: serving ≤0.35, jobs ~0.5, model calls ~0.4, warehouse checks ~0.7), then masking v2 (~0.8). Over CAD 10; you approved it against credits expiring October 10. Then the weather backfill (21:51–23:50 UTC, ~CAD 0.7–1.1), so ≈ CAD 14.5. CAD 8.86 had posted by 23:55 UTC and 11.65 by 02:05 UTC on September 25. The Cost Management API returns 429 in bursts, so recheck later |
 
 - **Rates** (Azure Retail Prices, `westus2`, CAD):
   - serverless jobs CAD 0.62/DBU (about 1.5 DBU per hour of job time);

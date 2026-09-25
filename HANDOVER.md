@@ -1,7 +1,7 @@
 # SentinelOps — handover for the next session
 
-Last updated: September 24, 2026, 23:55 UTC. Git `main` holds every milestone,
-one commit each (latest: REST API ingestion). There is no remote; see
+Last updated: September 25, 2026, 02:05 UTC. Git `main` holds every milestone,
+one commit each (latest: `abbba3b`, REST API ingestion). There is no remote; see
 section 6.
 
 **Where things stand.** Both halves of the portfolio project run in Azure
@@ -474,7 +474,7 @@ the budget in `infra/budget.json`, and the demo endpoint in
 - **Git:** branch `main`, author Cheng Huang <cheng.huang.ca@outlook.com>
   (repo-local config), no remote.
   - Recent milestones: `b94c34a` dashboards/Genie/budget, `d8bfec0`
-    serving, `9c1b93e` eval v2, `7a863dd` masking v2, then REST API
+    serving, `9c1b93e` eval v2, `7a863dd` masking v2, `abbba3b` REST API
     ingestion.
   - The CI workflow `.github/workflows/ci.yml` has never run.
 
