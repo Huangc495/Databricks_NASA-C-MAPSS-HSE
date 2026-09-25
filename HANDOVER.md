@@ -1,8 +1,8 @@
 # SentinelOps — handover for the next session
 
-Last updated: September 25, 2026, 03:15 UTC. Git `main` holds every milestone,
-one commit each (latest: `abbba3b`, REST API ingestion; the Event Hubs demo
-awaits the user's go-ahead to commit). There is no remote; see section 6.
+Last updated: September 25, 2026, 03:21 UTC. Git `main` holds every milestone,
+one commit each (latest: `1db22df`, the Event Hubs demo). There is no remote;
+see section 6.
 
 **Where things stand.** Both halves of the portfolio project run in Azure
 Databricks, and every job is manual, bounded and verified. 31 of the 40
@@ -504,7 +504,7 @@ the budget in `infra/budget.json`, and the demo endpoint in
   (repo-local config), no remote.
   - Recent milestones: `b94c34a` dashboards/Genie/budget, `d8bfec0`
     serving, `9c1b93e` eval v2, `7a863dd` masking v2, `abbba3b` REST API
-    ingestion; the Event Hubs demo is not committed yet.
+    ingestion, `1db22df` Event Hubs demo.
   - The CI workflow `.github/workflows/ci.yml` has never run.
 
 ## 7. Working agreement that has served well
