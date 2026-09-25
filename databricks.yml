@@ -40,8 +40,11 @@ targets:
     variables:
       catalog: sentinelops_staging
       schema: sentinelops
+    # A name_prefix preset would also rename the Unity Catalog schemas (bronze -> staging_bronze),
+    # which the code addresses by name, so a tag tells the environments apart instead.
     presets:
-      name_prefix: '[staging] '
+      tags:
+        environment: staging
     # The deploying principal owns its bundle folder; strict validation wants that stated here.
     permissions:
       - user_name: cheng.huang.ca@outlook.com
@@ -57,8 +60,11 @@ targets:
     variables:
       catalog: sentinelops_prod
       schema: sentinelops
+    # A name_prefix preset would also rename the Unity Catalog schemas (bronze -> prod_bronze),
+    # which the code addresses by name, so a tag tells the environments apart instead.
     presets:
-      name_prefix: '[prod] '
+      tags:
+        environment: prod
     # The deploying principal owns its bundle folder; strict validation wants that stated here.
     permissions:
       - user_name: cheng.huang.ca@outlook.com

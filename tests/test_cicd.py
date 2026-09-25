@@ -30,7 +30,9 @@ def test_each_environment_has_its_own_catalog_and_principal():
         assert {"user_name": "cheng.huang.ca@outlook.com", "level": "CAN_MANAGE"} in target["permissions"]
         # The principal owns its bundle folder; strict validation fails unless the bundle says so.
         assert {"service_principal_name": run_as(name), "level": "CAN_MANAGE"} in target["permissions"]
-        assert target["presets"]["name_prefix"] == f"[{name}] "
+        # name_prefix renames Unity Catalog schemas too (run 36094370073 created staging_bronze), and
+        # the code addresses schemas by name: environments are told apart by a tag instead.
+        assert "name_prefix" not in target["presets"] and target["presets"]["tags"] == {"environment": name}
     script = (ROOT / "scripts/setup_environment_catalogs.py").read_text()
     for target, catalog in (("staging", "sentinelops_staging"), ("prod", "sentinelops_prod")):
         assert re.search(rf'"{catalog}": \("{target}", "{run_as(target)}"\)', script)
