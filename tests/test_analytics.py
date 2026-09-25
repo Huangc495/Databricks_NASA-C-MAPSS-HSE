@@ -133,7 +133,8 @@ def test_bundle_dashboards_use_the_lookup_warehouse_and_viewer_credentials():
 
 
 def test_genie_space_follows_the_serialized_format_and_uses_curated_tables():
-    (space,) = RESOURCES["genie_spaces"].values()
+    # Dev-only: the space needs its tables, which only dev has (resources/analytics.yml).
+    (space,) = yaml.safe_load((ROOT / "resources" / "analytics.yml").read_text())["targets"]["dev"]["resources"]["genie_spaces"].values()
     assert space["warehouse_id"] == "${var.warehouse_id}"
     body = space["serialized_space"]
     assert body["version"] == 2

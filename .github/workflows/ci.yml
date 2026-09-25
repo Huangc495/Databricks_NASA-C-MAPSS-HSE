@@ -1,14 +1,102 @@
-name: Test
-on: [push, pull_request]
+name: CI/CD
+# Pull requests: unit tests, then bundle validation. Pushes to main: tests, then deploy staging
+# (and ingest + verify C-MAPSS there), then deploy prod once a reviewer approves the prod
+# environment. Databricks access is OIDC only: GitHub's short-lived token is exchanged for a
+# Databricks token of that environment's service principal (federation policies on the
+# principals); no secrets exist. Third-party actions are pinned to commit SHAs.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
 permissions:
   contents: read
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: false  # Never stop a deployment halfway.
+
+env:
+  DATABRICKS_HOST: https://adb-7405619144539463.3.azuredatabricks.net
+  DATABRICKS_AUTH_TYPE: github-oidc
+
 jobs:
-  unit:
+  test:
+    name: Unit tests
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-python@v5
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
         with:
           python-version: '3.12'
-      - run: python -m pip install -e '.[dev,databricks]'
+      - run: python -m pip install -r requirements-lock.txt -e '.[dev,databricks]' databricks-sdk==0.140.0
       - run: python -m pytest -q
+
+  validate:
+    name: Validate bundle (staging, prod)
+    # Pull requests from forks get no OIDC token, so only same-repository branches are validated.
+    if: github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      DATABRICKS_CLIENT_ID: 02bece01-ccd7-4130-8e8d-c8de43583e41  # sentinelops-staging-ci (subject: pull_request)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: databricks/setup-cli@d76f84cea9893ce68311a1f33fb0c95af6c963b7  # v1.17.0
+      - run: databricks bundle validate --strict -t staging
+      - run: databricks bundle validate --strict -t prod
+
+  staging:
+    name: Deploy and test staging
+    if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+    needs: test
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    environment: staging
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      DATABRICKS_CLIENT_ID: 02bece01-ccd7-4130-8e8d-c8de43583e41  # sentinelops-staging-ci (subject: environment:staging)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: databricks/setup-cli@d76f84cea9893ce68311a1f33fb0c95af6c963b7  # v1.17.0
+      - uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97  # v7.0.0
+        with:
+          python-version: '3.12'
+      - run: python -m pip install -r requirements-lock.txt -e . databricks-sdk==0.140.0
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9  # v6.1.0
+        with:
+          path: data/cmapss/CMAPSSData.zip
+          key: cmapss-md5-79a22f36e80606c69d0e9e4da5bb2b7a
+      - run: databricks bundle validate --strict -t staging
+      - run: databricks bundle deploy -t staging
+      # The NASA archive is MD5-checked, the landing files are prepared deterministically, and
+      # files already in the volume must be identical: reruns upload nothing.
+      - run: python -m sentinelops.landing
+      - run: python scripts/upload_landing.py data/landing/v1 /Volumes/sentinelops_staging/sentinelops/landing/cmapss_ingest/v1
+      - run: databricks bundle run -t staging cmapss_ingest
+      - run: databricks bundle run -t staging cmapss_verify
+
+  prod:
+    name: Deploy prod (after approval)
+    needs: staging
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    environment: prod  # Required reviewer; deployments from main only.
+    permissions:
+      contents: read
+      id-token: write
+    env:
+      DATABRICKS_CLIENT_ID: 5d729946-2748-48f4-9300-ba9a559bf93d  # sentinelops-prod-ci (subject: environment:prod)
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1
+      - uses: databricks/setup-cli@d76f84cea9893ce68311a1f33fb0c95af6c963b7  # v1.17.0
+      - run: databricks bundle validate --strict -t prod
+      - run: databricks bundle deploy -t prod

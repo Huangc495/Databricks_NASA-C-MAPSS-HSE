@@ -36,7 +36,7 @@ cost or prerequisites, with the reason given.
 | Cost visibility: meter-level Azure cost query | Done | Found an always-on NAT gateway/IP, ~CAD 1.7/day ("Cost and runtime controls") |
 | Azure budget alert | Done | Budget `sentinelops-dev-monthly` (your choice): CAD 150/month on both SentinelOps resource groups; emails at 50/80/100% of actual and 100% of forecast; `infra/budget.json`. A tripwire (alerts lag 8–24 h), not a cutoff |
 | Databricks billing tables (`system.billing`) access | Not started | Needs an account/metastore admin grant |
-| dev/staging/prod catalogs, service principals, `run_as` | Not started | After the demo features are complete |
+| dev/staging/prod catalogs, service principals, `run_as` | In progress | Catalogs `sentinelops_staging`/`sentinelops_prod`, principals `sentinelops-staging-ci`/`sentinelops-prod-ci` (plain users, `ALL PRIVILEGES` on their own catalog only), bundle targets with `run_as`; [CICD.md](CICD.md). Awaiting the first CI deployment |
 | Secrets in Key Vault or a secret scope | Done (demo) | Databricks-backed scope `sentinelops-eventhubs` held the Event Hubs listen key, read by the pipeline with `dbutils.secrets.get`; the send key never left the producer's process. Deleted with the namespace |
 | Private Link / VNet hardening | Deferred | Cost and complexity; public endpoints use authenticated access only |
 
@@ -87,7 +87,7 @@ cost or prerequisites, with the reason given.
 |---|---|---|
 | Unit tests (92) and local CI workflow file | Done (local) | `.github/workflows/ci.yml` has never run: no remote |
 | Git history | Done (local) | Branch `main`; no remote; one commit per milestone (`git log`) |
-| GitHub repository, CI runs, OIDC deployment to staging/prod | **Next** | Needs your choice of repository and visibility, plus catalogs, service principals and grants |
+| GitHub repository, CI runs, OIDC deployment to staging/prod | In progress | Public repo `Huangc495/Databricks_NASA-C-MAPSS-HSE`; Databricks OIDC federation policies (no secrets); workflow: tests → staging deploy + C-MAPSS ingest/verify → approved prod deploy. Awaiting the first run |
 | AI/BI dashboards and Genie space | Done | Fleet health and Safety incidents dashboards, Genie space over 6 curated Gold tables, `analytics_refresh` job; Genie 7/8 held-out questions fully right (one miscounted summary); [ANALYTICS.md](ANALYTICS.md) |
 | SQL warehouse right-sizing | Done | Starter warehouse Small → 2X-Small, auto-stop 10 → 5 min (your approval); a wake-up now costs ~CAD 0.35, not ~2.3 |
 | Demo script and portfolio write-up | Not started | Last |

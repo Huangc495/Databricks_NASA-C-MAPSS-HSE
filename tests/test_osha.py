@@ -90,8 +90,8 @@ def test_masking_v2_catches_shortened_employer_names_without_masking_ordinary_wo
     assert osha.mask("A Zorbex worker fell.", "Zorbex Fresh Meats", [], common=common)[0] == "A [EMPLOYER] worker fell."
     assert osha.mask("A cook at Joe's Diner was burned.", "Smith Holdings dba Joe's Diner", [], common=common)[0] == \
         "A cook at [EMPLOYER] was burned."
-    assert osha.mask("In LaGrange, Georgia, a Georgia Power lineman fell.", "Georgia Power Company", [],
-                     common=common)[0] == "In LaGrange, Georgia, a [EMPLOYER] lineman fell."
+    assert osha.mask("In Millbrook, Georgia, a Georgia Summit lineman fell.", "Georgia Summit Power Company", [],
+                     common=common)[0] == "In Millbrook, Georgia, a [EMPLOYER] lineman fell."
 
 
 def test_common_words_count_lowercase_uses_only():

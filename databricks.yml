@@ -29,3 +29,31 @@ targets:
     mode: development
     presets:
       pipelines_development: false
+  # CI/CD targets. GitHub Actions deploys each one as its own service principal (Databricks OIDC
+  # federation, no secrets), and that principal also runs every job and pipeline. Catalogs and
+  # grants: scripts/setup_environment_catalogs.py. Schemas and the landing volume:
+  # resources/environments.yml.
+  staging:
+    mode: production
+    workspace:
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
+    run_as:
+      service_principal_name: 02bece01-ccd7-4130-8e8d-c8de43583e41  # sentinelops-staging-ci
+    variables:
+      catalog: sentinelops_staging
+      schema: sentinelops
+    permissions:
+      - user_name: cheng.huang.ca@outlook.com
+        level: CAN_MANAGE
+  prod:
+    mode: production
+    workspace:
+      root_path: /Workspace/Users/${workspace.current_user.userName}/.bundle/${bundle.name}/${bundle.target}
+    run_as:
+      service_principal_name: 5d729946-2748-48f4-9300-ba9a559bf93d  # sentinelops-prod-ci
+    variables:
+      catalog: sentinelops_prod
+      schema: sentinelops
+    permissions:
+      - user_name: cheng.huang.ca@outlook.com
+        level: CAN_MANAGE

@@ -1,0 +1,41 @@
+# Schemas and the landing volume of the CI/CD targets, created on deploy by the target's service
+# principal. dev's were created by hand before the bundle existed, so dev doesn't declare them.
+# Pipelines refer to their schema resource here, so a first deploy creates the schema first.
+targets:
+  staging:
+    resources: &environment
+      schemas:
+        base:
+          catalog_name: ${var.catalog}
+          name: ${var.schema}
+          comment: Landing volume, registered models and bootstrap tables.
+        bronze:
+          catalog_name: ${var.catalog}
+          name: bronze
+          comment: Raw ingested data, as landed.
+        silver:
+          catalog_name: ${var.catalog}
+          name: silver
+          comment: Validated, deduplicated data and quarantines.
+        gold:
+          catalog_name: ${var.catalog}
+          name: gold
+          comment: Features, marts, predictions and monitoring.
+      volumes:
+        landing:
+          catalog_name: ${var.catalog}
+          schema_name: ${resources.schemas.base.name}
+          name: landing
+          volume_type: MANAGED
+          comment: Immutable landing files; never overwrite a consumed file.
+      pipelines:
+        cmapss_medallion:
+          schema: ${resources.schemas.bronze.name}
+        osha_safety:
+          schema: ${resources.schemas.bronze.name}
+        weather_open_meteo:
+          schema: ${resources.schemas.bronze.name}
+        cmapss_stream:
+          schema: ${resources.schemas.bronze.name}
+  prod:
+    resources: *environment

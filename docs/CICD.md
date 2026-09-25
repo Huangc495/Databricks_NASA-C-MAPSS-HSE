@@ -1,0 +1,93 @@
+# Environments and CI/CD
+
+Repository: https://github.com/Huangc495/Databricks_NASA-C-MAPSS-HSE (public).
+
+Three bundle targets share one workspace and one Unity Catalog metastore:
+
+| Target | Catalog | Deployed and run by | How |
+|---|---|---|---|
+| `dev` | `sentinelops_dev` | the developer (development mode) | `bundle deploy -t dev` from a laptop |
+| `staging` | `sentinelops_staging` | service principal `sentinelops-staging-ci` | GitHub Actions on every push to `main` |
+| `prod` | `sentinelops_prod` | service principal `sentinelops-prod-ci` | GitHub Actions after staging, once a reviewer approves |
+
+## Identity: OIDC, no secrets
+
+GitHub Actions requests a short-lived OIDC token for the job and exchanges it for a Databricks
+OAuth token (`DATABRICKS_AUTH_TYPE=github-oidc`). Databricks accepts the exchange only if a
+**federation policy** on the service principal matches the token.
+
+| Service principal | Application (client) ID | Federation subjects (issuer `https://token.actions.githubusercontent.com`, audience = account ID) |
+|---|---|---|
+| `sentinelops-staging-ci` | `02bece01-ccd7-4130-8e8d-c8de43583e41` | `repo:Huangc495/Databricks_NASA-C-MAPSS-HSE:environment:staging`, `repo:Huangc495/Databricks_NASA-C-MAPSS-HSE:pull_request` |
+| `sentinelops-prod-ci` | `5d729946-2748-48f4-9300-ba9a559bf93d` | `repo:Huangc495/Databricks_NASA-C-MAPSS-HSE:environment:prod` |
+
+- **No credentials anywhere.** There are no tokens, client secrets or keys in the repository, the
+  workflow or GitHub secrets. Client IDs aren't secrets: without a matching federated token,
+  they grant nothing.
+- **Pull requests** validate the bundle as the staging principal. Pull requests from forks get no
+  OIDC token, so they run only the unit tests.
+- **Least privilege:**
+  - Each principal is a plain workspace user (`workspace-access`, `databricks-sql-access`; not an
+    admin).
+  - Each has `ALL PRIVILEGES` on **its own catalog only**, and `CAN_USE` on the starter warehouse
+    (for dashboards).
+  - The catalogs belong to the developer, who keeps control.
+- **Setup scripts:** the catalogs (managed storage under the project's external location, bound to
+  this workspace only, predictive optimization off) come from
+  `scripts/setup_environment_catalogs.py`. The service principals, their workspace assignment and
+  their federation policies were created with the account API (the commands are below).
+
+## What each target contains
+
+- **The same bundle** (16 jobs, 4 pipelines, 2 dashboards), with `${var.catalog}` switching
+  every table and volume path.
+- **Target-only resources** (`resources/environments.yml`): the schemas `sentinelops`, `bronze`,
+  `silver` and `gold`, plus the `landing` volume, created by the principal on deploy.
+  Pipelines refer to the bronze schema resource, so the first deploy creates it first.
+- **Dev-only:** the Genie space, because it can't be created until its tables exist.
+- **Staging runs C-MAPSS end to end on every push:**
+  - The workflow downloads the MD5-verified NASA archive (cached) and prepares the same landing
+    files as dev (`python -m sentinelops.landing`).
+  - It uploads them without overwriting (`scripts/upload_landing.py`: an existing file must be
+    identical), then runs `cmapss_ingest` and `cmapss_verify` as the staging principal.
+  - Reruns upload nothing and append nothing.
+- **Prod is deploy-only:** the jobs and pipelines exist, but no data is landed and nothing runs.
+
+## The workflow (`.github/workflows/ci.yml`)
+
+| Event | Jobs |
+|---|---|
+| Pull request | Unit tests → `bundle validate --strict` for staging and prod |
+| Push to `main` | Unit tests → deploy staging, land C-MAPSS, ingest, verify → **wait for approval** → deploy prod |
+| Manual (`workflow_dispatch`) on `main` | Same as a push |
+
+- **Pinned actions:** every action is pinned to a commit SHA (checkout v7.0.1, setup-python
+  v7.0.0, cache v6.1.0, Databricks setup-cli v1.17.0, the same CLI version as local
+  development). Only the deploy and validate jobs get `id-token: write`.
+- **No cancellation:** deployments never cancel each other; `concurrency` queues them.
+- **GitHub environments:**
+  - `staging`: deployments from `main` only.
+  - `prod`: a required reviewer, deployments from `main` only.
+  - They must exist **before** the first push. A job that names a missing environment creates it
+    with no protection.
+
+## Costs
+
+- **GitHub Actions:** free for public repositories.
+- **Deploys:** free.
+- **Staging ingest and verify:** about 20–30 minutes of serverless job time per push to `main`
+  (≈ CAD 0.3–0.5). It's the main recurring cost, so push to `main` deliberately.
+
+## Commands used for setup (account admin, run once)
+
+```powershell
+# Account API (Azure CLI auth needs the tenant for the account host):
+$env:ARM_TENANT_ID='<tenant id>'; $env:DATABRICKS_HOST='https://accounts.azuredatabricks.net'
+$env:DATABRICKS_ACCOUNT_ID='5b731cd2-ed03-4635-963e-154fc8b4f034'; $env:DATABRICKS_AUTH_TYPE='azure-cli'
+databricks account service-principals create --display-name sentinelops-staging-ci --active
+databricks account workspace-assignment update 7405619144539463 <principal id> --json '{"permissions": ["USER"]}'
+databricks account service-principal-federation-policy create <principal id> --json '{"oidc_policy": {"issuer": "https://token.actions.githubusercontent.com", "audiences": ["5b731cd2-ed03-4635-963e-154fc8b4f034"], "subject": "repo:Huangc495/Databricks_NASA-C-MAPSS-HSE:environment:staging"}}'
+# Workspace: entitlements (SCIM patch), catalogs and grants, warehouse CAN_USE:
+.venv/Scripts/python.exe scripts/setup_environment_catalogs.py
+databricks permissions update warehouses <warehouse id> --json '{"access_control_list": [{"service_principal_name": "<application id>", "permission_level": "CAN_USE"}]}'
+```
