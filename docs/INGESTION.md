@@ -125,6 +125,100 @@ Summarize any update's flow metrics and refresh techniques with
 leaves out event details, so use the REST events API as that script's
 docstring shows. See STATUS.md for run IDs and evidence files.
 
+## REST API ingestion: Open-Meteo weather
+
+A third ingestion style, next to files (C-MAPSS, OSHA): a REST API is fetched
+into immutable landing, then Auto Loader takes it through Bronze, Silver and
+Gold. The weather can be joined to OSHA heat-illness reports by state and
+month.
+
+**Source and terms** (checked September 24, 2026):
+- Open-Meteo Historical Weather API, `archive-api.open-meteo.com/v1/archive`.
+  It needs no key. The free API is for non-commercial use only, which covers
+  this portfolio project.
+- The data is CC BY 4.0: credit "Weather data by Open-Meteo.com" with a link
+  to https://open-meteo.com/. ERA5 is from the Copernicus Climate Change
+  Service. Table comments and fetch logs carry the attribution.
+- Free limits are 600 calls/minute, 5,000/hour and 10,000/day. A call is one
+  location, up to 10 variables and up to 14 days, and longer requests count
+  fractionally more. One location-year of daily data counts as ~26 calls.
+
+**What is fetched (landing v1, frozen).**
+- Daily ERA5 `temperature_2m_max`, `temperature_2m_mean` and
+  `apparent_temperature_max` in °C, over each location's local day.
+- One point per state for the 20 states with the most OSHA heat-illness
+  reports (92% of 2,624). Each point is the state's largest city.
+- One request per location and calendar year, 2015–2025: 220 requests,
+  ~5,740 weighted calls. `sentinelops.open_meteo.LOCATIONS_V1` holds the
+  locations, and a test pins the spec's digest. Changing locations, variables
+  or the model means a new landing version, never an edit of v1.
+
+**Fetch task** (`jobs/fetch_open_meteo.py`, stdlib HTTP, no new dependency):
+- **File names come from the request.** Example:
+  `era5_texas--houston_2015-01-01_2015-12-31.json`. The pipeline parses the
+  location and window back out of the name.
+- **Raw bytes, never overwritten.** Each response lands byte for byte through
+  the Files API with `overwrite=False`, a single PUT, so a file appears whole
+  or not at all. Files already present are skipped, so reruns resume.
+- **Budgeted.** A run spends at most `--max-weighted-calls` (4,000). The
+  hourly and daily limits, at 80%, are reduced by the calls recorded in
+  earlier runs' fetch logs. The limits are per IP and serverless IPs are
+  shared, so this is a self-imposed guardrail. Requests are paced under 480
+  weighted calls per rolling minute.
+- **Failures.** HTTP 429 stops the run at once, with no retry. 5xx and network
+  errors get 2 retries with backoff. Any other 4xx, or a body that isn't a
+  JSON object, is rejected and not landed.
+- **Log.** Every request (file, weight, bytes, SHA-256, time) is written to
+  `landing/open_meteo/_fetch_log/<job run id>.json`, outside the Auto Loader
+  path.
+- **Responses aren't reproducible byte for byte.** `generationtime_ms`
+  varies, and `utc_offset_seconds` is the zone's offset *at request time*
+  (−18000 for a whole 2015 Houston series fetched in September). Re-fetching
+  would therefore never match; the SHA-256 in the log proves what was landed.
+  Silver ignores the offset.
+
+**Pipeline** `weather_open_meteo` (`pipelines/weather.py`):
+- Bronze `open_meteo_daily`: Auto Loader JSON, one row per file, with an
+  explicit schema covering every response field and `_rescued_data`.
+- Silver `weather_daily` (key `location_id, date`): one row per day. Days that
+  fail a rule go to `weather_quarantine` with the names of the rules they
+  failed:
+  - schema conforms;
+  - known file name;
+  - °C units;
+  - complete series (every array as long as the window);
+  - each date at its position;
+  - values present, plausible, and the mean not above the max.
+
+  The latest landed copy of a day wins.
+- Gold `weather_state_monthly` (key `state, month`): monthly means and
+  extremes, hot-day counts (max ≥ 90 °F and 95 °F; apparent max ≥ 90 °F and
+  103 °F) and a completeness flag. `state` and `month` match OSHA's `state`
+  and `event_month`.
+
+**Verify task** (`jobs/verify_weather.py`):
+- Every landed file still matches its logged SHA-256.
+- The Files API refuses an overwrite (a probe).
+- Bronze has exactly one row per file.
+- Quarantine, Silver and Gold equal a pandas recomputation from the raw files
+  (`sentinelops.weather`): Silver bit for bit, Gold averages to 1e-9.
+
+```powershell
+. ./scripts/Use-SentinelOps.ps1
+.tools/databricks/databricks.exe bundle run -t dev weather_ingest --no-wait
+# A backfill above the hourly budget needs another run an hour or more later;
+# once everything has landed, a rerun makes no API calls and appends nothing.
+```
+
+**Caveats.**
+- One city is a proxy for a whole state; Houston is not El Paso.
+- ERA5 is a ~28 km grid cell, smoother and usually cooler at the daily
+  maximum than a city station.
+- Apparent temperature is Open-Meteo's feels-like measure, not the NWS heat
+  index.
+- OSHA's reports cover federal-jurisdiction workplaces only. Any
+  weather/injury association is descriptive, not causal.
+
 ## Official references checked September 23, 2026
 
 - [Auto Loader schema behavior](https://learn.microsoft.com/en-us/azure/databricks/ingestion/cloud-object-storage/auto-loader/schema)

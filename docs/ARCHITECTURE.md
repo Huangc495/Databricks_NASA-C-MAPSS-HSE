@@ -84,7 +84,8 @@ reference for local tests and the bootstrap.
 Training consumes the Gold tables. A validation-gated promotion job,
 idempotent fleet batch scoring into a timestamped inference log, and
 delayed-label monitoring are in place (see [OPERATIONS.md](OPERATIONS.md)).
-Still missing: real-time serving, orchestrated retraining, and alerting.
+Orchestrated retraining (`cmapss_retrain`), threshold alerts and a bounded
+real-time serving demo followed.
 Additional external locations are deferred until a source needs access outside
 the existing managed volume. Do not repeatedly tune against the fixed official
 test set; the fleet monitoring metrics reuse those engines.
@@ -97,3 +98,11 @@ keyed by `report_id`, which is the citation key. Retrieval will be exact
 cosine search over pay-per-token embeddings stored in Delta, because a
 Vector Search endpoint alone costs ~CAD 9.3/day. Incident similarity alone does
 not establish causes or regulatory compliance.
+
+REST API ingestion has its own pipeline, `weather_open_meteo`. The
+`weather_ingest` job fetches Open-Meteo daily ERA5 weather within a
+weighted-call budget and lands the raw responses unchanged in
+`landing/open_meteo/v1`, never overwriting a file. Auto Loader then builds
+Bronze → Silver (with quarantine) → Gold `weather_state_monthly`, keyed by
+state and month like OSHA's reports. A verify task recomputes the tables from
+the raw files. See [INGESTION.md](INGESTION.md#rest-api-ingestion-open-meteo-weather).

@@ -131,7 +131,24 @@ this timeout reduces exposure but is not a hard billing cap.
    used. On 8 held-out questions, Genie gave 6 fully correct answers, declined
    the employer-identification probe, and miscounted one summary. See
    [docs/ANALYTICS.md](docs/ANALYTICS.md).
-5. Add Event Hubs/API sources and OIDC staging/production CI/CD.
+5. REST API ingestion. Done: the manual job `weather_ingest` fetches
+   Open-Meteo daily ERA5 temperatures (one city in each of the 20 states with
+   the most OSHA heat-illness reports, 2015–2025).
+   - **Fetch.** The raw responses land in an immutable prefix. Uploads use
+     `overwrite=False`, file names come from the request, and each run keeps
+     within a weighted-call budget derived from the free tier's limits, so
+     the 220-request backfill took two runs an hour apart.
+   - **Pipeline.** The `weather_open_meteo` pipeline (Auto Loader) builds
+     Bronze, Silver with rule-based quarantine, and a Gold state × month mart
+     keyed like OSHA's reports.
+   - **Verify.** A verify task recomputes Silver and Gold from the raw files:
+     bit-identical.
+   - **Rerun proof.** The rerun made 0 API calls and appended 0 rows.
+
+   See [docs/INGESTION.md](docs/INGESTION.md#rest-api-ingestion-open-meteo-weather).
+   Weather data by [Open-Meteo.com](https://open-meteo.com/) (CC BY 4.0), ERA5
+   from the Copernicus Climate Change Service.
+6. Add an Event Hubs streaming source and OIDC staging/production CI/CD.
 
 Dataset provenance: NASA PCoE, [Zenodo record 15346912](https://zenodo.org/records/15346912),
 DOI 10.5281/zenodo.15346912, archive MD5 `79a22f36e80606c69d0e9e4da5bb2b7a`.

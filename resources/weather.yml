@@ -1,0 +1,90 @@
+resources:
+  pipelines:
+    weather_open_meteo:
+      name: sentinelops-weather-open-meteo
+      catalog: ${var.catalog}
+      schema: bronze
+      serverless: true
+      continuous: false
+      development: false
+      channel: CURRENT
+      edition: ADVANCED
+      libraries:
+        - file:
+            path: ../pipelines/weather.py
+      configuration:
+        sentinelops.catalog: ${var.catalog}
+        sentinelops.weather_landing: /Volumes/${var.catalog}/${var.schema}/landing/open_meteo/v1
+        pipelines.maxFlowRetryAttempts: '0'
+        pipelines.numUpdateRetryAttempts: '0'
+  jobs:
+    # Manual only. REST API ingestion: fetch Open-Meteo daily ERA5 weather (20 states, one city
+    # each) into immutable landing within a weighted-call budget (free tier, non-commercial;
+    # 5,000 calls/hour, so the 2015-2025 backfill takes two runs an hour apart), ingest it with
+    # Auto Loader into Bronze/Silver/Gold, then verify the tables against the raw files.
+    weather_ingest:
+      name: sentinelops-weather-ingest
+      max_concurrent_runs: 1
+      timeout_seconds: 3600
+      performance_target: STANDARD
+      tasks:
+        - task_key: fetch
+          max_retries: 0
+          disable_auto_optimization: true
+          timeout_seconds: 1500
+          spark_python_task:
+            python_file: ../jobs/fetch_open_meteo.py
+            parameters:
+              - --catalog
+              - ${var.catalog}
+              - --schema
+              - ${var.schema}
+              - --first-year
+              - '2015'
+              - --last-year
+              - '2025'
+              - --max-weighted-calls
+              - '4000'
+              - --job-run-id
+              - '{{job.run_id}}'
+              - --source-root
+              - ${workspace.file_path}/src
+          environment_key: fetch
+        - task_key: medallion
+          depends_on:
+            - task_key: fetch
+          max_retries: 0
+          disable_auto_optimization: true
+          timeout_seconds: 900
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.weather_open_meteo.id}
+            full_refresh: false
+        - task_key: verify
+          depends_on:
+            - task_key: medallion
+          max_retries: 0
+          disable_auto_optimization: true
+          timeout_seconds: 900
+          spark_python_task:
+            python_file: ../jobs/verify_weather.py
+            parameters:
+              - --catalog
+              - ${var.catalog}
+              - --schema
+              - ${var.schema}
+              - --source-root
+              - ${workspace.file_path}/src
+          environment_key: verify
+      environments:
+        - environment_key: fetch
+          spec:
+            environment_version: '4'
+            dependencies:
+              - databricks-sdk==0.140.0
+        - environment_key: verify
+          spec:
+            environment_version: '4'
+            dependencies:
+              - numpy==2.5.3
+              - pandas==2.3.3
+              - databricks-sdk==0.140.0

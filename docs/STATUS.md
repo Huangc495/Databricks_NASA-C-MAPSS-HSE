@@ -1,18 +1,20 @@
 # Build status
 
-Last verified: September 24, 2026, 19:40 UTC (employer-name masking v2).
+Last verified: September 24, 2026, 23:55 UTC (REST API ingestion, Open-Meteo weather).
 
 **At a glance.**
 
-- **Progress:** 28 of 40 tracked tasks are done. Next is REST API ingestion
-  (it needs your choice of source and approval of the download); 9 tasks are
-  not started and 2 are deferred.
+- **Progress:** 29 of 40 tracked tasks are done. Next is the Event Hubs
+  streaming demo (it needs your approval of a billable namespace, a secret
+  scope and a new client dependency); 8 tasks are not started and 2 are
+  deferred.
 - **Live state (read-only checks):** no active job runs, no classic clusters,
   no Vector Search or custom serving endpoints, and all pipelines IDLE. The
   starter warehouse is STOPPED (2X-Small, 5-minute auto-stop). `@champion` is
   v3 (READY).
-- **Cost:** September 24 is projected at about CAD 13.4 (over CAD 10). The
-  serving demo, eval v2 and masking v2 were approved against your credits,
+- **Cost:** September 24 is projected at about CAD 14.5 (over CAD 10): the
+  earlier ~13.4 plus the REST API milestone (~1). The serving demo, eval v2,
+  masking v2 and the weather backfill were approved against your credits,
   which expire October 10. See "Cost and runtime controls".
 - **Git:** every milestone is committed on `main`; there is no remote.
 
@@ -28,7 +30,7 @@ cost or prerequisites, with the reason given.
 | Task | Status | Evidence or next action |
 |---|---|---|
 | Azure foundation: ADLS Gen2, workspace, access connector, UC catalog | Done | `infra/main.bicep`; "Azure" section below |
-| Bundle deployment (dev target, strict validation, manual jobs) | Done | `databricks.yml`, `resources/*.yml`; 14 jobs, 2 pipelines, 2 dashboards and 1 Genie space deployed; a test enforces job guardrails, including no serverless auto-retries |
+| Bundle deployment (dev target, strict validation, manual jobs) | Done | `databricks.yml`, `resources/*.yml`; 15 jobs, 3 pipelines, 2 dashboards and 1 Genie space deployed; a test enforces job guardrails, including no serverless auto-retries |
 | Cost visibility: meter-level Azure cost query | Done | Found an always-on NAT gateway/IP, ~CAD 1.7/day ("Cost and runtime controls") |
 | Azure budget alert | Done | Budget `sentinelops-dev-monthly` (your choice): CAD 150/month on both SentinelOps resource groups; emails at 50/80/100% of actual and 100% of forecast; `infra/budget.json`. A tripwire (alerts lag 8–24 h), not a cutoff |
 | Databricks billing tables (`system.billing`) access | Not started | Needs an account/metastore admin grant |
@@ -43,8 +45,8 @@ cost or prerequisites, with the reason given.
 | C-MAPSS FD001 Auto Loader + Lakeflow medallion with quarantine/conflicts | Done | Pipeline `77ecd502…`; parity verified |
 | Incremental ingestion probe and no-input rerun | Done | `medallion-probe-*.json`, `medallion-rerun-update.json` |
 | FD002–FD004 (multiple operating conditions) | Not started | Keys and `--subset` already support it; needs condition-aware features |
-| REST API ingestion (e.g. weather/energy JSON) | **Next** | Needs your choice of a keyless, clearly licensed API and approval of the download |
-| Event Hubs (Kafka endpoint) streaming | Not started | Bills while the namespace exists: demo only, then delete |
+| REST API ingestion (Open-Meteo weather) | Done | Job `weather_ingest`: budgeted, resumable fetch of 220 raw responses into immutable landing → Auto Loader Bronze/Silver/Gold → verify against the raw files; two backfill runs, then a rerun with 0 API calls and 0 rows appended; `weather-backfill.json` |
+| Event Hubs (Kafka endpoint) streaming | **Next** | Bills while the namespace exists: demo only, then delete. Needs your approval of the namespace, a secret scope and a new client dependency |
 
 ### Predictive-maintenance ML
 
@@ -88,12 +90,73 @@ cost or prerequisites, with the reason given.
 | SQL warehouse right-sizing | Done | Starter warehouse Small → 2X-Small, auto-stop 10 → 5 min (your approval); a wake-up now costs ~CAD 0.35, not ~2.3 |
 | Demo script and portfolio write-up | Not started | Last |
 
-Recommended order (details in HANDOVER.md): REST API ingestion → Event Hubs
-streaming demo → environments and CI/CD → optional ML depth and agent
-deployment → demo script and write-up. The budget alert, dashboards/Genie,
-serving demo, eval v2 and masking v2 are done.
+Recommended order (details in HANDOVER.md): Event Hubs streaming demo →
+environments and CI/CD → optional ML depth and agent deployment → demo
+script and write-up. The budget alert, dashboards/Genie, serving demo,
+eval v2, masking v2 and REST API ingestion are done.
 
-## Current milestone: employer-name masking v2 (OSHA)
+## Current milestone: REST API ingestion (Open-Meteo weather)
+
+A third ingestion style, next to files: a REST API fetched into immutable
+landing, then Auto Loader into Bronze/Silver/Gold. Details:
+[INGESTION.md](INGESTION.md#rest-api-ingestion-open-meteo-weather); evidence
+[weather-backfill.json](weather-backfill.json).
+
+- **Source (your choice):** the Open-Meteo Historical Weather API. It needs no
+  key; data is CC BY 4.0 ("Weather data by Open-Meteo.com", ERA5 from
+  Copernicus), and the free API is for non-commercial use.
+  - Fetched: daily ERA5 max, mean and apparent max temperature for 2015–2025.
+    There is one city per state, for the 20 states with the most OSHA
+    heat-illness reports (92% of 2,624).
+  - 220 requests, ~5,740 weighted calls. The free limit is 5,000 per hour, so
+    the backfill took two runs.
+- **Approvals:** the downloads (one local test request, then the cloud
+  fetches), the deploy and three runs.
+- **Job `weather_ingest`** (`584629930216724`): fetch → pipeline
+  `weather_open_meteo` (`8eca1296-fbee-409a-a093-f3d8b82ca7f6`) → verify.
+- **Run 1 `795987049449431` SUCCESS (26.7 min).**
+  - Fetch: 153 files, 1.60 MB, 3,991.9 weighted calls. It stopped at its
+    4,000 budget as designed, with 67 left.
+  - Pipeline update `974f3091…`: Bronze appended 153 rows; Silver has 55,887
+    days, all 8 rules passed, 0 quarantined; Gold has 1,836 state-months.
+  - Verify: 153/153 SHA-256 matches, the **overwrite probe was refused**,
+    Silver is bit-identical to the pandas recomputation, and Gold is within
+    2.1e-14.
+- **Run 2 `722495160937045` SUCCESS (23.5 min), started once run 1's calls
+  had left the hourly window.**
+  - Fetch: skipped the 153 landed files and fetched the last 67 (694 KB,
+    1,748.1 weighted calls; 5,740 in total). The guardrail read run 1's log:
+    0 calls in the last hour, 3,991.9 in the last day.
+  - Pipeline update `a2097c00…`: Bronze appended exactly **67**, so ingested
+    files weren't re-read. Silver has **80,360** days (20 locations × 4,018)
+    and Gold **2,640** state-months, all complete, 0 quarantined. Gold
+    refreshed incrementally (`GENERIC_AGGREGATE`).
+  - Verify: 220/220 SHA-256 matches, the overwrite probe was refused, and
+    Silver is bit-identical.
+- **Run 3 `899114500995009` SUCCESS: the rerun proof.**
+  - Fetch: all 220 files present, so **0 API calls** (0.5 min).
+  - Pipeline update `edd01293…`: Bronze appended **0**, and every
+    materialized view was `NO_OP`.
+  - Verify: passed, with the same counts.
+- **Cost:** about 46 minutes of serverless execution (≈ 70 minutes including
+  compute startup, three tasks per run), ≈ CAD 0.7–1.1, all on September 24
+  (UTC). The API is free. Nothing is running afterwards.
+- **Found in the local rehearsal:** responses aren't byte-reproducible.
+  `generationtime_ms` varies, and `utc_offset_seconds` is the zone's offset at
+  request time. Skipping (never re-fetching) and the logged SHA-256 are what
+  make landing immutable.
+- **Caveats:**
+  - one city stands in for a state;
+  - ERA5 is a ~28 km grid cell, cooler at the daily maximum than a city
+    station;
+  - apparent temperature isn't the NWS heat index;
+  - no join to OSHA yet; the marts share `state` and `month`.
+- **Tests:** 108 pass (16 new): the frozen spec, file names, call weights,
+  budget and resume, 429/5xx/4xx handling, pacing, never overwriting (local
+  and Files API), the pandas reference rules, and the pipeline/reference
+  contract (the pipeline file runs against Spark stand-ins).
+
+## Earlier milestone: employer-name masking v2 (OSHA)
 
 Eval v2 found an answer naming the report's own employer: masking v1 had
 missed shortened employer names. Masking v2 closes that gap. Details:
@@ -685,7 +748,7 @@ section is kept only so older links still resolve.
   | Day | Posted | By meter | Notes |
   |---|---|---|---|
   | September 23 | CAD 5.41 (final) | Serverless SQL 2.16, serverless jobs 1.85, NAT and IP 1.31 (19 h) | The projection of CAD 3–4 missed a Catalog Explorer browse at 19:23 UTC, which ran the Small warehouse for about 11 minutes (2.2 DBU) |
-  | September 24 | CAD 8.05 by 16:55 UTC (usage to ~11:00) | Serverless jobs 2.60, serverless SQL 2.42 (Catalog Explorer, 05:44), model calls 2.23, NAT and IP 0.76 | Projected ≈ CAD 13.4: the fixed remainder (~0.9), dashboards/Genie (~1.6), the serving demo and eval v2 (~2.0: serving ≤0.35, jobs ~0.5, model calls ~0.4, warehouse checks ~0.7), then masking v2 (~0.8). Over CAD 10; you approved it against credits expiring October 10. The Cost Management API returned 429 at 18:30–19:36 UTC, so recheck later |
+  | September 24 | CAD 8.05 by 16:55 UTC (usage to ~11:00) | Serverless jobs 2.60, serverless SQL 2.42 (Catalog Explorer, 05:44), model calls 2.23, NAT and IP 0.76 | Projected ≈ CAD 13.4: the fixed remainder (~0.9), dashboards/Genie (~1.6), the serving demo and eval v2 (~2.0: serving ≤0.35, jobs ~0.5, model calls ~0.4, warehouse checks ~0.7), then masking v2 (~0.8). Over CAD 10; you approved it against credits expiring October 10. Then the weather backfill (21:51–23:50 UTC, ~CAD 0.7–1.1), so ≈ CAD 14.5. CAD 8.86 had posted by 23:55 UTC. The Cost Management API returns 429 in bursts, so recheck later |
 
 - **Rates** (Azure Retail Prices, `westus2`, CAD):
   - serverless jobs CAD 0.62/DBU (about 1.5 DBU per hour of job time);

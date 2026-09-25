@@ -1,11 +1,11 @@
 # SentinelOps — handover for the next session
 
-Last updated: September 24, 2026, 19:50 UTC. Git `main` holds every milestone,
-one commit each (latest: `7a863dd`, masking v2). There is no remote; see
+Last updated: September 24, 2026, 23:55 UTC. Git `main` holds every milestone,
+one commit each (latest: REST API ingestion). There is no remote; see
 section 6.
 
 **Where things stand.** Both halves of the portfolio project run in Azure
-Databricks, and every job is manual, bounded and verified. 28 of the 40
+Databricks, and every job is manual, bounded and verified. 29 of the 40
 tracked tasks are done. The **Task status** table at the top of
 [docs/STATUS.md](docs/STATUS.md) is the authoritative tracker; update it as
 work lands.
@@ -33,12 +33,21 @@ work lands.
       requests declined.
 - **Self-service analytics:** two AI/BI dashboards and a Genie space, all
   bundle resources, fed by the `analytics_refresh` job.
+- **REST API ingestion** (Open-Meteo weather, job `weather_ingest`):
+  - A budgeted, resumable fetch of 220 raw daily-ERA5 responses into an
+    immutable landing prefix (Files API, `overwrite=False`).
+  - Auto Loader into Bronze/Silver/Gold (`gold.weather_state_monthly`, keyed
+    by state and month like OSHA's reports).
+  - A verify task that recomputes the tables from the raw files and gets them
+    bit-identical.
+  - Two backfill runs, then a rerun with 0 API calls and 0 rows appended.
 - **Cost guardrails:**
   - Azure budget `sentinelops-dev-monthly` (CAD 150/month, email alerts);
   - the starter SQL warehouse is 2X-Small with a 5-minute auto-stop.
 
-**Next task:** REST API ingestion (section 3, task A). It needs the user's
-choice of source and approval of the download.
+**Next task:** the Event Hubs streaming demo (section 3, task B). It needs
+the user's approval of a billable namespace, a secret scope and a new client
+dependency.
 
 ## 1. Start here
 
@@ -57,9 +66,9 @@ choice of source and approval of the download.
 ```powershell
 . ./scripts/Use-SentinelOps.ps1
 az account show --query '{name:name,id:id,user:user.name}' -o json
-.venv/Scripts/python.exe -m pytest -q                      # expect 92 passed
+.venv/Scripts/python.exe -m pytest -q                      # expect 108 passed
 .tools/databricks/databricks.exe bundle validate --strict -t dev
-.tools/databricks/databricks.exe bundle plan -t dev        # expect only the 3 known no-op job "updates" (section 4)
+.tools/databricks/databricks.exe bundle plan -t dev        # expect only the 4 known no-op job "updates" (section 4)
 .tools/databricks/databricks.exe jobs list-runs --active-only -o json
 .tools/databricks/databricks.exe clusters list -o json
 .tools/databricks/databricks.exe warehouses list -o json   # starter warehouse: STOPPED, 2X-Small, auto-stop 5
@@ -71,9 +80,9 @@ az account show --query '{name:name,id:id,user:user.name}' -o json
 3. Check posted costs before any compute. Billing lags about 9 hours, so a
    low number isn't proof of low spend. The API sometimes returns 429;
    retry after a few minutes.
-   - September 24 (UTC) was projected at about CAD 13.4. The user approved
-     going over CAD 10 against Azure credits that expire **October 10,
-     2026**.
+   - September 24 (UTC) was projected at about CAD 14.5: ~13.4 before the
+     weather backfill, which added ~CAD 0.7–1.1. The user approved going
+     over CAD 10 against Azure credits that expire **October 10, 2026**.
    - Record the posted figures for September 24 and 25 in STATUS ("Cost and
      runtime controls").
 
@@ -143,46 +152,35 @@ then run in the cloud. Finish with the checklist in section 7.
 
 | # | Task | Approval needed | Cost character |
 |---|---|---|---|
-| A | REST API ingestion (**next**) | Yes: the source, and the download | Serverless job minutes; the API is free |
-| B | Event Hubs (Kafka endpoint) streaming demo | Yes: namespace (billable), secret scope, new SDK dependency | Hourly namespace cost; delete the same day |
+| A | REST API ingestion | Done (Open-Meteo weather) | About CAD 1 for the backfill; reruns make no API calls |
+| B | Event Hubs (Kafka endpoint) streaming demo (**next**) | Yes: namespace (billable), secret scope, new SDK dependency | Hourly namespace cost; delete the same day |
 | C | Environments and CI/CD (staging/prod, service principals, GitHub, OIDC) | Yes: repository and visibility, catalogs, principals, grants | Mostly free |
 | D | Optional: agent deployment and review app | Yes: serving endpoint | Serving while scaled up, plus tokens |
 | E | Optional ML depth: FD002–FD004, tuning, `mlflow.evaluate`, sequence baseline, Lakehouse Monitoring | Landing upload (FD002–4); monitoring (billable) | Serverless minutes; monitoring has a 2× DBU multiplier |
 | F | Small follow-ups (below) | Varies | Cents |
 | G | Demo script and portfolio write-up (last) | Publishing externally: yes | Free |
 
-### A. REST API ingestion (next)
+### A. REST API ingestion (done)
 
-**Goal:** a third ingestion style (API → immutable landing → Auto Loader →
-medallion), next to files (C-MAPSS) and, later, streaming (Event Hubs).
+Open-Meteo daily ERA5 weather. The design, terms and caveats are in
+`docs/INGESTION.md` ("REST API ingestion"); the evidence is in
+`docs/weather-backfill.json`. Optional follow-ups, none started:
 
-1. **Choose a source with the user.**
-   - Prefer keyless APIs with a clear license. Suggestion: Open-Meteo's
-     historical weather archive (keyless; CC BY 4.0, attribution required;
-     check the current terms and rate limits). Daily maximum temperature for
-     one representative city per state could later be joined to OSHA
-     heat-illness reports by state and month.
-   - A keyed API (for example EIA) needs a secret scope; see task B.
-2. **Fetch job** (`jobs/fetch_<source>.py`, manual bundle job, same
-   guardrails as the others).
-   - Request a bounded, parameterized window.
-   - Write each **raw** response unchanged to
-     `/Volumes/.../landing/<source>/v1/...json`, with deterministic file
-     names from the request parameters, and never overwrite: skip if present.
-   - Log request counts and bytes. Serverless jobs already reach PyPI, so
-     egress works; confirm the API is reachable.
-3. **Pipeline:** Auto Loader JSON with an explicit schema and
-   `_rescued_data` into Bronze; typed, deduplicated Silver with
-   expectations and quarantine; a Gold mart. Follow `pipelines/osha.py` and
-   `pipelines/medallion.py`.
-4. **Tests:** file naming and immutability, response parsing, the schema.
-   Rehearse locally on one saved response before any cloud run.
-5. **Evidence:** a first run, then a rerun that appends 0 rows (a
-   checkpoint proof), with the pipeline update summarized by
-   `scripts/pipeline_update_evidence.py` into `docs/`. Optionally, a
-   dashboard tile or Genie table.
+- **A join mart:** heat-illness reports vs hot days, by state and month. The
+  Gold tables `weather_state_monthly` and `osha_injury_facts` share `state`
+  and `month`/`event_month`. The best home is a view created by
+  `analytics_refresh`, which owns the facts and the Genie comments. A
+  dashboard tile or a Genie table costs warehouse time to check, so ask
+  first. Report associations as descriptive, not causal.
+- **More years or places:**
+  - Fetch only complete past years. ERA5 lags ~5 days, and preliminary ERA5T
+    becomes final after ~2–3 months. A partial year would land nulls that
+    Silver quarantines, and under v1 that file can never be replaced.
+  - New locations, variables or a new model change the frozen spec (a test
+    pins its digest). That is landing `v2`, with a new append flow, as in
+    masking v2.
 
-### B. Event Hubs streaming demo (bounded)
+### B. Event Hubs streaming demo (next, bounded)
 
 1. **Check prices** (Event Hubs Standard throughput unit per hour, plus
    ingress). Standard is the lowest tier with the Kafka endpoint.
@@ -325,6 +323,14 @@ The masking gap no longer blocks this; masking v2 is verified.
   - `sentinelops.extraction` (job `osha_extraction_eval`).
   - `scripts/scan_answer_names.py` scans reports for employer names,
     locally.
+- **Weather (REST API):**
+  - Job `weather_ingest`: fetch → `weather_open_meteo` → verify.
+  - `sentinelops.open_meteo`: the frozen v1 spec, the budgeted fetch, and the
+    local and volume stores.
+  - `sentinelops.weather`: the pandas reference for Silver and Gold, which
+    verify compares every run.
+  - `python -m sentinelops.open_meteo` lands one local test response into
+    `data/`; it counts as a download, so ask first.
 - **Analytics:** `analytics_refresh` rebuilds `gold.osha_injury_facts` and
   `gold.cmapss_fleet_status`, adds comments for Genie, and runs every
   dashboard dataset and Genie example query. Edit
@@ -348,7 +354,7 @@ The masking gap no longer blocks this; masking v2 is verified.
 | `pipelines list-pipeline-events` lacks details | Use `databricks api get "/api/2.0/pipelines/<id>/events?max_results=250"`, then `scripts/pipeline_update_evidence.py` |
 | STANDARD jobs can wait 3–7 minutes for resources | Ingest runs take 11–12 of their 15 minutes; if one times out while waiting, rerun it before raising the limit |
 | Bundle dev mode forces development pipelines | Keep `targets.dev.presets.pipelines_development: false` |
-| Every deploy "updates" three jobs | `cmapss_ingest`, `osha_ingest` and `cmapss_retrain` resend identical settings (the API doesn't echo `disable_auto_optimization` on pipeline tasks); harmless. `bundle deploy --select <resource>` deploys one resource |
+| Every deploy "updates" four jobs | `cmapss_ingest`, `osha_ingest`, `cmapss_retrain` and `weather_ingest` (every job with a pipeline task) resend identical settings (the API doesn't echo `disable_auto_optimization` on pipeline tasks); harmless. `bundle deploy --select <resource>` deploys one resource |
 | Serverless tasks retried despite `max_retries: 0` | Serverless auto-optimization retries failed tasks. Every task sets `disable_auto_optimization: true`; `tests/test_bundle.py` enforces it |
 | If/else conditions need task values | Task values can only be set from notebooks, whose environment differs. `cmapss_retrain` uses self-deciding steps (`--only-if-changed`, `--only-pending`) |
 | Running one task of a job | `jobs run-now --json @file` with `"only": ["task"]`; other tasks show `DISABLED`, and a failure reads `INTERNAL_ERROR`/`FAILED` |
@@ -378,6 +384,12 @@ The masking gap no longer blocks this; masking v2 is verified.
 | Genie summary numbers | It miscounted 43 listed rows (21 vs 20). Give example SQL that aggregates, and check its SQL results, not its prose |
 | Serving endpoint provisioning | ~10 minutes from create to READY (container build). Scale-to-zero stops billing after 30 idle minutes |
 | AI Gateway inference table on a CPU custom model | Standard delivery took 5–40 minutes (no `_otel_logs`). Check it later, not in the same job |
+| Open-Meteo responses aren't byte-reproducible | `utc_offset_seconds` is the zone's offset at request time, and `generationtime_ms` varies. Never re-fetch to "repair" a file: the fetch log's SHA-256 is the provenance, and Silver ignores the offset |
+| Free API limits count weighted calls, per IP | One location-year is ~26 calls. The fetch budget reads earlier fetch logs (hour and day windows at 80%): start the next backfill run an hour after the last one ended, or it shrinks its own budget. A 429 stops the run with no retry |
+| Never-overwrite landing in a UC volume | Files API `upload(..., overwrite=False)` is one PUT, and the service refuses it on an existing file (the SDK raises an already-exists error). `verify_weather` probes it every run |
+| Testing a pipeline file without pyspark | `tests/test_weather.py` runs `pipelines/weather.py` with stand-in modules and calls every dataset function. MagicMock has no `>`, so filter with SQL strings |
+| Three-task serverless job timing | Each task waited 3–5 min for compute. A no-op rerun still takes ~20 min wall, ~10 of them execution |
+| CLI prints "Databricks skills are not installed" | A hint on stderr from the CLI; ignore it (redirect stderr before parsing JSON) |
 | Browser checks of the workspace | The in-app browser needs the user to sign in, and it can't save screenshots or zoom. Claude in Chrome was not connected on September 24 |
 
 ## 5. Resources
@@ -409,6 +421,8 @@ the budget in `infra/budget.json`, and the demo endpoint in
 | job `osha_extraction_eval` | `804198192778755` | Extraction (run `570236144351626`) |
 | job `analytics_refresh` | `847239470140874` | Marts + SQL checks (run `429694746857912`) |
 | dashboards `fleet_health` / `safety_incidents` | `01f1b83350951effa1d1f1bc6ca9e6cd` / `01f1b83350861a42888ebab34d8a8785` | Published, viewer credentials |
+| pipeline `weather_open_meteo` | `8eca1296-fbee-409a-a093-f3d8b82ca7f6` | Open-Meteo Bronze→Silver→Gold; updates `974f3091…`, `a2097c00…`, `edd01293…` (rerun, all NO_OP) |
+| job `weather_ingest` | `584629930216724` | Fetch → pipeline → verify: runs `795987049449431`, `722495160937045`, rerun `899114500995009` |
 | genie space `sentinelops_operations` | `01f1b8347de912dc8d94fcb07a9144ec` | 6 curated Gold tables |
 
 - All jobs are manual, STANDARD, one concurrent run, zero retries (including
@@ -428,11 +442,15 @@ the budget in `infra/budget.json`, and the demo endpoint in
   - `cmapss/` (bootstrap);
   - `cmapss_ingest/v1` (includes the permanent quality probe);
   - `osha_sir/v1` (masking v1);
-  - `osha_sir/v2` (masking v2; its copies win in Silver).
+  - `osha_sir/v2` (masking v2; its copies win in Silver);
+  - `open_meteo/v1/daily` (220 raw responses, never overwritten) and
+    `open_meteo/_fetch_log` (one log per fetch run, which the call budget
+    reads).
 - **Tables:**
   - `bronze.{cmapss_lines, cmapss_labels, osha_sir_reports}`
-  - `silver.{cmapss_observations, cmapss_quarantine, cmapss_conflicts, cmapss_endpoint_labels, osha_incidents, osha_quarantine}`
-  - `gold.{cmapss_features, cmapss_training_labels, cmapss_test_endpoints, cmapss_predictions, cmapss_model_performance, cmapss_feature_drift, cmapss_alerts, cmapss_fleet_status, osha_documents, osha_embeddings, osha_extractions, osha_injury_facts}`
+  - `bronze.open_meteo_daily`
+  - `silver.{cmapss_observations, cmapss_quarantine, cmapss_conflicts, cmapss_endpoint_labels, osha_incidents, osha_quarantine, weather_daily, weather_quarantine}`
+  - `gold.{cmapss_features, cmapss_training_labels, cmapss_test_endpoints, cmapss_predictions, cmapss_model_performance, cmapss_feature_drift, cmapss_alerts, cmapss_fleet_status, osha_documents, osha_embeddings, osha_extractions, osha_injury_facts, weather_state_monthly}`
   - bootstrap `sentinelops_dev.{silver_fd001_train, gold_fd001_features, gold_fd001_predictions}`
 
 ## 6. Local workspace and tools
@@ -447,6 +465,7 @@ the budget in `infra/budget.json`, and the demo endpoint in
   - `data/osha` (**the raw OSHA archive with employer and address data;
     never upload, commit or print names from it**);
   - `data/landing/*` (prepared landing files: `v1`, `osha_v1`, `osha_v2`);
+  - `data/open_meteo/rehearsal` (the one local test response);
   - `artifacts/`.
 - **Pinned cloud dependencies** (serverless environment 4 / Python 3.12):
   numpy 2.5.3, pandas 2.3.3, scikit-learn 1.9.1, MLflow 3.16.1, skops 0.15.0,
@@ -455,7 +474,8 @@ the budget in `infra/budget.json`, and the demo endpoint in
 - **Git:** branch `main`, author Cheng Huang <cheng.huang.ca@outlook.com>
   (repo-local config), no remote.
   - Recent milestones: `b94c34a` dashboards/Genie/budget, `d8bfec0`
-    serving, `9c1b93e` eval v2, `7a863dd` masking v2.
+    serving, `9c1b93e` eval v2, `7a863dd` masking v2, then REST API
+    ingestion.
   - The CI workflow `.github/workflows/ci.yml` has never run.
 
 ## 7. Working agreement that has served well

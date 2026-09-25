@@ -1,0 +1,605 @@
+{
+  "milestone": "REST API ingestion (Open-Meteo weather)",
+  "recorded": "2026-09-24",
+  "job": {
+    "name": "weather_ingest",
+    "job_id": 584629930216724
+  },
+  "pipeline": {
+    "name": "weather_open_meteo",
+    "pipeline_id": "8eca1296-fbee-409a-a093-f3d8b82ca7f6"
+  },
+  "source": {
+    "endpoint": "https://archive-api.open-meteo.com/v1/archive",
+    "attribution": "Weather data by Open-Meteo.com (CC BY 4.0), ERA5 from the Copernicus Climate Change Service",
+    "license": "CC BY 4.0 (https://open-meteo.com/en/licence); free API for non-commercial use only",
+    "terms_checked": "2026-09-24: 600 calls/minute, 5,000/hour, 10,000/day; one call = one location, <=10 variables, <=14 days",
+    "model": "era5",
+    "daily": [
+      "temperature_2m_max",
+      "temperature_2m_mean",
+      "apparent_temperature_max"
+    ],
+    "landing_version": "v1",
+    "spec_sha256": "044a9330944ad10c3b2644c6a270936e1a37b96ababae4284b82009d9cad1290",
+    "locations": [
+      {
+        "state": "TEXAS",
+        "city": "Houston",
+        "latitude": 29.76,
+        "longitude": -95.37,
+        "timezone": "America/Chicago",
+        "location_id": "texas--houston"
+      },
+      {
+        "state": "FLORIDA",
+        "city": "Jacksonville",
+        "latitude": 30.33,
+        "longitude": -81.66,
+        "timezone": "America/New_York",
+        "location_id": "florida--jacksonville"
+      },
+      {
+        "state": "GEORGIA",
+        "city": "Atlanta",
+        "latitude": 33.75,
+        "longitude": -84.39,
+        "timezone": "America/New_York",
+        "location_id": "georgia--atlanta"
+      },
+      {
+        "state": "PENNSYLVANIA",
+        "city": "Philadelphia",
+        "latitude": 39.95,
+        "longitude": -75.17,
+        "timezone": "America/New_York",
+        "location_id": "pennsylvania--philadelphia"
+      },
+      {
+        "state": "ARKANSAS",
+        "city": "Little Rock",
+        "latitude": 34.75,
+        "longitude": -92.29,
+        "timezone": "America/Chicago",
+        "location_id": "arkansas--little-rock"
+      },
+      {
+        "state": "MISSOURI",
+        "city": "Kansas City",
+        "latitude": 39.1,
+        "longitude": -94.58,
+        "timezone": "America/Chicago",
+        "location_id": "missouri--kansas-city"
+      },
+      {
+        "state": "LOUISIANA",
+        "city": "New Orleans",
+        "latitude": 29.95,
+        "longitude": -90.07,
+        "timezone": "America/Chicago",
+        "location_id": "louisiana--new-orleans"
+      },
+      {
+        "state": "ILLINOIS",
+        "city": "Chicago",
+        "latitude": 41.88,
+        "longitude": -87.63,
+        "timezone": "America/Chicago",
+        "location_id": "illinois--chicago"
+      },
+      {
+        "state": "OKLAHOMA",
+        "city": "Oklahoma City",
+        "latitude": 35.47,
+        "longitude": -97.52,
+        "timezone": "America/Chicago",
+        "location_id": "oklahoma--oklahoma-city"
+      },
+      {
+        "state": "ALABAMA",
+        "city": "Huntsville",
+        "latitude": 34.73,
+        "longitude": -86.59,
+        "timezone": "America/Chicago",
+        "location_id": "alabama--huntsville"
+      },
+      {
+        "state": "OHIO",
+        "city": "Columbus",
+        "latitude": 39.96,
+        "longitude": -83.0,
+        "timezone": "America/New_York",
+        "location_id": "ohio--columbus"
+      },
+      {
+        "state": "MISSISSIPPI",
+        "city": "Jackson",
+        "latitude": 32.3,
+        "longitude": -90.18,
+        "timezone": "America/Chicago",
+        "location_id": "mississippi--jackson"
+      },
+      {
+        "state": "NEW JERSEY",
+        "city": "Newark",
+        "latitude": 40.74,
+        "longitude": -74.17,
+        "timezone": "America/New_York",
+        "location_id": "new-jersey--newark"
+      },
+      {
+        "state": "KANSAS",
+        "city": "Wichita",
+        "latitude": 37.69,
+        "longitude": -97.33,
+        "timezone": "America/Chicago",
+        "location_id": "kansas--wichita"
+      },
+      {
+        "state": "NEW YORK",
+        "city": "New York",
+        "latitude": 40.71,
+        "longitude": -74.01,
+        "timezone": "America/New_York",
+        "location_id": "new-york--new-york"
+      },
+      {
+        "state": "WISCONSIN",
+        "city": "Milwaukee",
+        "latitude": 43.04,
+        "longitude": -87.91,
+        "timezone": "America/Chicago",
+        "location_id": "wisconsin--milwaukee"
+      },
+      {
+        "state": "MASSACHUSETTS",
+        "city": "Boston",
+        "latitude": 42.36,
+        "longitude": -71.06,
+        "timezone": "America/New_York",
+        "location_id": "massachusetts--boston"
+      },
+      {
+        "state": "COLORADO",
+        "city": "Denver",
+        "latitude": 39.74,
+        "longitude": -104.99,
+        "timezone": "America/Denver",
+        "location_id": "colorado--denver"
+      },
+      {
+        "state": "NEBRASKA",
+        "city": "Omaha",
+        "latitude": 41.26,
+        "longitude": -95.93,
+        "timezone": "America/Chicago",
+        "location_id": "nebraska--omaha"
+      },
+      {
+        "state": "WEST VIRGINIA",
+        "city": "Charleston",
+        "latitude": 38.35,
+        "longitude": -81.63,
+        "timezone": "America/New_York",
+        "location_id": "west-virginia--charleston"
+      }
+    ],
+    "years": "2015-2025",
+    "requests": 220,
+    "weighted_calls": 5740.0
+  },
+  "local_rehearsal": {
+    "request": "era5_texas--houston_2015-01-01_2015-12-31.json",
+    "bytes": 10537,
+    "sha256": "20567f393dfd6655105c5ed77423f5847e48f9e5072145b62f7e2ff816e9ac25",
+    "days": 365,
+    "failed_rules": 0,
+    "finding": "utc_offset_seconds is the zone's offset at request time (-18000 for a 2015 America/Chicago series fetched in September) and generationtime_ms varies, so re-fetches are never byte-identical; landing skips rather than re-fetches"
+  },
+  "runs": [
+    {
+      "run_id": 795987049449431,
+      "purpose": "Backfill part 1: stopped at its 4,000 weighted-call budget",
+      "state": "SUCCESS",
+      "tasks": {
+        "medallion": {
+          "run_id": 343374798203882,
+          "state": "SUCCESS",
+          "minutes": 7.6,
+          "setup_minutes": 0.0,
+          "execution_minutes": 7.5
+        },
+        "fetch": {
+          "run_id": 749338667196413,
+          "state": "SUCCESS",
+          "minutes": 12.0,
+          "setup_minutes": 3.2,
+          "execution_minutes": 8.7,
+          "summary": {
+            "job_run_id": "795987049449431",
+            "planned": 220,
+            "already_present": 0,
+            "used_before": {
+              "minute": 0.0,
+              "hour": 0.0,
+              "day": 0.0
+            },
+            "budget": 4000.0,
+            "fetched": 153,
+            "bytes": 1600443,
+            "weighted_calls": 3991.93,
+            "remaining": 67,
+            "stopped": "budget",
+            "error": null,
+            "started_at": "2026-09-24T21:55:01.708129+00:00",
+            "finished_at": "2026-09-24T22:03:18.526134+00:00"
+          }
+        },
+        "verify": {
+          "run_id": 494404779069492,
+          "state": "SUCCESS",
+          "minutes": 7.2,
+          "setup_minutes": 3.1,
+          "execution_minutes": 4.1,
+          "summary": {
+            "landed_files": 153,
+            "landed_bytes": 1600443,
+            "sha256_verified": 153,
+            "overwrite_refused": true,
+            "bronze_rows": 153,
+            "silver_days": 55887,
+            "quarantined": 0,
+            "gold_months": 1836,
+            "complete_months": 1836,
+            "states": 14,
+            "first_month": "2015-01",
+            "last_month": "2025-12",
+            "max_float_difference": 2.1316282072803006e-14,
+            "seconds": 210.1
+          }
+        }
+      },
+      "pipeline_update": {
+        "update_id": "974f3091-79b3-4272-8552-4da7e50c3a6a",
+        "state": "COMPLETED",
+        "flows": [
+          {
+            "flow": "sentinelops_dev.bronze.open_meteo_daily",
+            "refresh": "STREAMING_APPEND",
+            "output_rows": 153,
+            "data_quality": null
+          },
+          {
+            "flow": "sentinelops_dev.gold.weather_state_monthly",
+            "refresh": "COMPLETE_RECOMPUTE",
+            "output_rows": 1836,
+            "data_quality": {
+              "dropped_records": 0,
+              "warned_records": 0
+            }
+          },
+          {
+            "flow": "sentinelops_dev.silver.weather_daily",
+            "refresh": "COMPLETE_RECOMPUTE",
+            "output_rows": 55887,
+            "data_quality": {
+              "dropped_records": 0,
+              "expectations": [
+                {
+                  "dataset": "valid_days",
+                  "failed_records": 0,
+                  "name": "complete_series",
+                  "passed_records": 55887
+                },
+                {
+                  "dataset": "valid_days",
+                  "failed_records": 0,
+                  "name": "date_matches_position",
+                  "passed_records": 55887
+                },
+                {
+                  "dataset": "valid_days",
+                  "failed_records": 0,
+                  "name": "plausible_values",
+                  "passed_records": 55887
+                },
+                {
+                  "dataset": "valid_days",
+                  "failed_records": 0,
+                  "name": "mean_not_above_max",
+                  "passed_records": 55887
+                },
+                {
+                  "dataset": "valid_days",
+                  "failed_records": 0,
+                  "name": "celsius_units",
+                  "passed_records": 55887
+                },
+                {
+                  "dataset": "valid_days",
+                  "failed_records": 0,
+                  "name": "has_values",
+                  "passed_records": 55887
+                },
+                {
+                  "dataset": "valid_days",
+                  "failed_records": 0,
+                  "name": "known_file_name",
+                  "passed_records": 55887
+                },
+                {
+                  "dataset": "valid_days",
+                  "failed_records": 0,
+                  "name": "schema_conforms",
+                  "passed_records": 55887
+                }
+              ],
+              "warned_records": 0
+            }
+          },
+          {
+            "flow": "sentinelops_dev.silver.weather_quarantine",
+            "refresh": "COMPLETE_RECOMPUTE",
+            "output_rows": 0,
+            "data_quality": {
+              "dropped_records": 0,
+              "warned_records": 0
+            }
+          }
+        ]
+      }
+    },
+    {
+      "run_id": 722495160937045,
+      "purpose": "Backfill part 2 (an hour later): skipped the 153 landed files, fetched the last 67",
+      "state": "SUCCESS",
+      "tasks": {
+        "medallion": {
+          "run_id": 1086839718103733,
+          "state": "SUCCESS",
+          "minutes": 8.1,
+          "setup_minutes": 0.0,
+          "execution_minutes": 8.1
+        },
+        "fetch": {
+          "run_id": 643643560947665,
+          "state": "SUCCESS",
+          "minutes": 7.2,
+          "setup_minutes": 3.3,
+          "execution_minutes": 3.9,
+          "summary": {
+            "job_run_id": "722495160937045",
+            "planned": 220,
+            "already_present": 153,
+            "used_before": {
+              "minute": 0.0,
+              "hour": 0.0,
+              "day": 3991.9271999999887
+            },
+            "budget": 4000.0,
+            "fetched": 67,
+            "bytes": 694476,
+            "weighted_calls": 1748.07,
+            "remaining": 0,
+            "stopped": "complete",
+            "error": null,
+            "started_at": "2026-09-24T23:09:08.573546+00:00",
+            "finished_at": "2026-09-24T23:12:30.332123+00:00"
+          }
+        },
+        "verify": {
+          "run_id": 822848381816792,
+          "state": "SUCCESS",
+          "minutes": 8.2,
+          "setup_minutes": 4.6,
+          "execution_minutes": 3.6,
+          "summary": {
+            "landed_files": 220,
+            "landed_bytes": 2294919,
+            "sha256_verified": 220,
+            "overwrite_refused": true,
+            "bronze_rows": 220,
+            "silver_days": 80360,
+            "quarantined": 0,
+            "gold_months": 2640,
+            "complete_months": 2640,
+            "states": 20,
+            "first_month": "2015-01",
+            "last_month": "2025-12",
+            "max_float_difference": 2.1316282072803006e-14,
+            "seconds": 191.7
+          }
+        }
+      },
+      "pipeline_update": {
+        "update_id": "a2097c00-681d-43a8-bf42-ce4e4400a065",
+        "state": "COMPLETED",
+        "flows": [
+          {
+            "flow": "sentinelops_dev.bronze.open_meteo_daily",
+            "refresh": "STREAMING_APPEND",
+            "output_rows": 67,
+            "data_quality": null
+          },
+          {
+            "flow": "sentinelops_dev.gold.weather_state_monthly",
+            "refresh": "GENERIC_AGGREGATE",
+            "output_rows": 2640,
+            "data_quality": {
+              "dropped_records": 0,
+              "warned_records": 0
+            }
+          },
+          {
+            "flow": "sentinelops_dev.silver.weather_daily",
+            "refresh": "COMPLETE_RECOMPUTE",
+            "output_rows": 80360,
+            "data_quality": {
+              "dropped_records": 0,
+              "expectations": [
+                {
+                  "dataset": "valid_days",
+                  "failed_records": 0,
+                  "name": "complete_series",
+                  "passed_records": 80360
+                },
+                {
+                  "dataset": "valid_days",
+                  "failed_records": 0,
+                  "name": "date_matches_position",
+                  "passed_records": 80360
+                },
+                {
+                  "dataset": "valid_days",
+                  "failed_records": 0,
+                  "name": "plausible_values",
+                  "passed_records": 80360
+                },
+                {
+                  "dataset": "valid_days",
+                  "failed_records": 0,
+                  "name": "mean_not_above_max",
+                  "passed_records": 80360
+                },
+                {
+                  "dataset": "valid_days",
+                  "failed_records": 0,
+                  "name": "celsius_units",
+                  "passed_records": 80360
+                },
+                {
+                  "dataset": "valid_days",
+                  "failed_records": 0,
+                  "name": "has_values",
+                  "passed_records": 80360
+                },
+                {
+                  "dataset": "valid_days",
+                  "failed_records": 0,
+                  "name": "known_file_name",
+                  "passed_records": 80360
+                },
+                {
+                  "dataset": "valid_days",
+                  "failed_records": 0,
+                  "name": "schema_conforms",
+                  "passed_records": 80360
+                }
+              ],
+              "warned_records": 0
+            }
+          },
+          {
+            "flow": "sentinelops_dev.silver.weather_quarantine",
+            "refresh": "APPEND_ONLY",
+            "output_rows": 0,
+            "data_quality": {
+              "dropped_records": 0,
+              "warned_records": 0
+            }
+          }
+        ]
+      }
+    },
+    {
+      "run_id": 899114500995009,
+      "purpose": "Rerun proof: no API calls, nothing appended, every materialized view NO_OP",
+      "state": "SUCCESS",
+      "tasks": {
+        "medallion": {
+          "run_id": 514687811113889,
+          "state": "SUCCESS",
+          "minutes": 6.1,
+          "setup_minutes": 0.0,
+          "execution_minutes": 6.0
+        },
+        "fetch": {
+          "run_id": 179885445036619,
+          "state": "SUCCESS",
+          "minutes": 5.1,
+          "setup_minutes": 4.6,
+          "execution_minutes": 0.5,
+          "summary": {
+            "job_run_id": "899114500995009",
+            "planned": 220,
+            "already_present": 220,
+            "used_before": {
+              "minute": 0.0,
+              "hour": 1748.070800000002,
+              "day": 5739.997999999977
+            },
+            "budget": 2251.93,
+            "fetched": 0,
+            "bytes": 0,
+            "weighted_calls": 0.0,
+            "remaining": 0,
+            "stopped": "complete",
+            "error": null,
+            "started_at": "2026-09-24T23:35:08.359827+00:00",
+            "finished_at": "2026-09-24T23:35:08.757829+00:00"
+          }
+        },
+        "verify": {
+          "run_id": 949459408003940,
+          "state": "SUCCESS",
+          "minutes": 8.6,
+          "setup_minutes": 4.9,
+          "execution_minutes": 3.7,
+          "summary": {
+            "landed_files": 220,
+            "landed_bytes": 2294919,
+            "sha256_verified": 220,
+            "overwrite_refused": true,
+            "bronze_rows": 220,
+            "silver_days": 80360,
+            "quarantined": 0,
+            "gold_months": 2640,
+            "complete_months": 2640,
+            "states": 20,
+            "first_month": "2015-01",
+            "last_month": "2025-12",
+            "max_float_difference": 2.1316282072803006e-14,
+            "seconds": 193.6
+          }
+        }
+      },
+      "pipeline_update": {
+        "update_id": "edd01293-6269-4f27-9002-0c49531f11ab",
+        "state": "COMPLETED",
+        "note": "NO_OP flows rewrote nothing; their reported output_rows is an event metric, not the table row count.",
+        "flows": [
+          {
+            "flow": "sentinelops_dev.bronze.open_meteo_daily",
+            "refresh": "STREAMING_APPEND",
+            "output_rows": 0,
+            "data_quality": null
+          },
+          {
+            "flow": "sentinelops_dev.gold.weather_state_monthly",
+            "refresh": "NO_OP",
+            "output_rows": 2640,
+            "data_quality": {
+              "dropped_records": 0,
+              "warned_records": 0
+            }
+          },
+          {
+            "flow": "sentinelops_dev.silver.weather_daily",
+            "refresh": "NO_OP",
+            "output_rows": 0,
+            "data_quality": {}
+          },
+          {
+            "flow": "sentinelops_dev.silver.weather_quarantine",
+            "refresh": "NO_OP",
+            "output_rows": 0,
+            "data_quality": {
+              "dropped_records": 0,
+              "warned_records": 0
+            }
+          }
+        ]
+      }
+    }
+  ]
+}
