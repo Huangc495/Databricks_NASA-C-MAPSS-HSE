@@ -219,6 +219,95 @@ month.
 - OSHA's reports cover federal-jurisdiction workplaces only. Any
   weather/injury association is descriptive, not causal.
 
+## Streaming ingestion: Event Hubs Kafka endpoint (bounded demo)
+
+The third ingestion style: events. C-MAPSS FD001 test trajectories are
+replayed from a local machine (standing in for an edge gateway) into Azure
+Event Hubs. The `cmapss_stream` pipeline reads them back through Event Hubs'
+Kafka-compatible endpoint. The namespace bills by the hour, so it exists only
+during a demo.
+
+**Infrastructure** (`infra/eventhubs-demo.bicep`; deploy with what-if first,
+delete the same day):
+- namespace `evhns-sentinelops-7s5fwy`: Standard, 1 TU, TLS 1.2, no
+  auto-inflate. Standard is the lowest tier with the Kafka endpoint.
+- hub `cmapss-telemetry`: 2 partitions, 1-day retention;
+- two namespace-level SAS policies, `cmapss-listen` (Listen only) and
+  `cmapss-send` (Send only).
+
+**Prices** (Azure Retail Prices, `westus2`, CAD, checked September 25, 2026):
+- throughput unit CAD 0.0416/hour;
+- ingress CAD 0.0388 per million events (one event per 64 KB);
+- the price list also carries a "Standard Kafka Endpoint" meter at CAD
+  0.1247/hour, although the pricing page lists Kafka as included in Standard.
+  The worst case, ~CAD 0.17/hour, is what's budgeted; check the meter-level
+  cost afterwards.
+
+**Secrets:**
+- The listen key goes in the Databricks-backed secret scope
+  `sentinelops-eventhubs` (key `cmapss-listen`). The pipeline reads it with
+  `dbutils.secrets.get`.
+- The send key is read with the signed-in Azure CLI inside the producer's
+  process and is used only to sign a one-hour SAS token.
+- Neither key is printed, written to disk or passed on a command line
+  (`scripts/eventhubs_demo.py put-secret` / `produce`).
+
+**Producer** (`sentinelops.stream`, standard library only):
+- One JSON event per trajectory row, with a deterministic `event_id`
+  (`CMAPSS-FD001-test-001-001`). Values stay JSON numbers: Python's shortest
+  round-trip repr parses back to the same doubles Spark casts from the text.
+- Each engine goes to one partition (`(unit − 1) mod 2`), in cycle order.
+- Events are posted with the REST batch API (`/partitions/{p}/messages`,
+  ≤ 256 KB and 500 events per batch).
+- Nothing is retried, because a timed-out batch may still have been accepted.
+  The local send log (`artifacts/eventhubs/`) makes a second send refuse to
+  run.
+
+**Pipeline** `cmapss_stream` (`pipelines/stream.py`, triggered):
+- Bronze `cmapss_stream_events`: the Kafka source over `SASL_SSL`/`PLAIN` on
+  port 9093 (user `$ConnectionString`), `startingOffsets=earliest` and
+  `failOnDataLoss=true`, since events expire after the retention period. It
+  keeps the payload text plus partition, offset and enqueued time.
+- Silver `cmapss_stream_observations`: `from_json` with an explicit schema,
+  and 5 rules:
+  - a JSON object;
+  - exactly the expected fields (`json_object_keys`);
+  - valid keys;
+  - an `event_id` that matches the keys;
+  - finite values.
+
+  Failures go to `cmapss_stream_quarantine` with the rules they failed. Silver
+  keeps one row per key (the first-enqueued copy) and counts `copies`.
+
+**Verify** (`jobs/verify_stream.py`):
+- Bronze holds one event per replayed observation, and every `event_id`
+  once.
+- Quarantine is empty, and Silver has no duplicates.
+- Every streamed observation equals the file-ingested `silver.cmapss_observations`
+  row for the same key, bit for bit, with no key missing on either side.
+- It also reports whether offsets are contiguous and each engine's cycles
+  arrived in order.
+
+```powershell
+. ./scripts/Use-SentinelOps.ps1
+az provider register --namespace Microsoft.EventHub --wait   # once per subscription
+az deployment group what-if --resource-group rg-sentinelops-dev --template-file infra/eventhubs-demo.bicep
+az deployment group create --resource-group rg-sentinelops-dev --name eventhubs-demo --template-file infra/eventhubs-demo.bicep
+.venv/Scripts/python.exe scripts/eventhubs_demo.py put-secret
+.tools/databricks/databricks.exe bundle deploy -t dev
+.venv/Scripts/python.exe scripts/eventhubs_demo.py produce
+.tools/databricks/databricks.exe bundle run -t dev cmapss_stream_ingest --no-wait
+# Afterwards, the same day:
+az eventhubs namespace delete --resource-group rg-sentinelops-dev --name evhns-sentinelops-7s5fwy
+.tools/databricks/databricks.exe secrets delete-scope sentinelops-eventhubs
+```
+
+Without the namespace, `cmapss_stream_ingest` can't connect, so run it only
+during a demo. A recreated namespace gets new keys, so rerun `put-secret`. Its
+empty hub starts at offset 0, while the pipeline's checkpoint remembers the
+old offsets, so reset the stream (a full refresh of `cmapss_stream`) before
+reusing it.
+
 ## Official references checked September 23, 2026
 
 - [Auto Loader schema behavior](https://learn.microsoft.com/en-us/azure/databricks/ingestion/cloud-object-storage/auto-loader/schema)

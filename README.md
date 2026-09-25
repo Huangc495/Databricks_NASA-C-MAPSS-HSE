@@ -148,7 +148,20 @@ this timeout reduces exposure but is not a hard billing cap.
    See [docs/INGESTION.md](docs/INGESTION.md#rest-api-ingestion-open-meteo-weather).
    Weather data by [Open-Meteo.com](https://open-meteo.com/) (CC BY 4.0), ERA5
    from the Copernicus Climate Change Service.
-6. Add an Event Hubs streaming source and OIDC staging/production CI/CD.
+6. Streaming ingestion. Done, as a bounded demo:
+   - **Replay.** A local, standard-library producer replayed the 13,096 FD001
+     test rows as JSON events into Azure Event Hubs (one partition per
+     engine, in cycle order).
+   - **Pipeline.** The `cmapss_stream` pipeline reads them through the Kafka
+     endpoint (`SASL_SSL`, with the listen key held in a Databricks secret
+     scope) into Bronze and Silver with quarantine.
+   - **Verify.** Every streamed observation was bit-identical to the
+     file-ingested one, and a rerun appended nothing.
+   - **Clean-up.** The namespace existed for 43.5 minutes and was deleted
+     with the secret scope.
+
+   See [docs/INGESTION.md](docs/INGESTION.md#streaming-ingestion-event-hubs-kafka-endpoint-bounded-demo).
+7. Add OIDC staging/production CI/CD.
 
 Dataset provenance: NASA PCoE, [Zenodo record 15346912](https://zenodo.org/records/15346912),
 DOI 10.5281/zenodo.15346912, archive MD5 `79a22f36e80606c69d0e9e4da5bb2b7a`.

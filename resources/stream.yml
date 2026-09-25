@@ -1,0 +1,60 @@
+resources:
+  pipelines:
+    # Bounded Event Hubs demo. The namespace (infra/eventhubs-demo.bicep) exists only during a demo and
+    # is deleted afterwards; without it this pipeline fails to connect, so run it only while it exists.
+    cmapss_stream:
+      name: sentinelops-cmapss-stream
+      catalog: ${var.catalog}
+      schema: bronze
+      serverless: true
+      continuous: false
+      development: false
+      channel: CURRENT
+      edition: ADVANCED
+      libraries:
+        - file:
+            path: ../pipelines/stream.py
+      configuration:
+        sentinelops.catalog: ${var.catalog}
+        sentinelops.eventhubs_namespace: evhns-sentinelops-7s5fwy
+        sentinelops.eventhubs_hub: cmapss-telemetry
+        sentinelops.eventhubs_policy: cmapss-listen
+        sentinelops.eventhubs_secret_scope: sentinelops-eventhubs
+        pipelines.maxFlowRetryAttempts: '0'
+        pipelines.numUpdateRetryAttempts: '0'
+  jobs:
+    # Manual only, while the demo namespace exists. Reads the replayed C-MAPSS events through the
+    # Kafka endpoint into Bronze/Silver, then checks them against the file-ingested observations.
+    cmapss_stream_ingest:
+      name: sentinelops-cmapss-stream-ingest
+      max_concurrent_runs: 1
+      timeout_seconds: 1800
+      performance_target: STANDARD
+      tasks:
+        - task_key: stream
+          max_retries: 0
+          disable_auto_optimization: true
+          timeout_seconds: 900
+          pipeline_task:
+            pipeline_id: ${resources.pipelines.cmapss_stream.id}
+            full_refresh: false
+        - task_key: verify
+          depends_on:
+            - task_key: stream
+          max_retries: 0
+          disable_auto_optimization: true
+          timeout_seconds: 900
+          spark_python_task:
+            python_file: ../jobs/verify_stream.py
+            parameters:
+              - --catalog
+              - ${var.catalog}
+              - --subset
+              - FD001
+              - --split
+              - test
+          environment_key: verify
+      environments:
+        - environment_key: verify
+          spec:
+            environment_version: '4'

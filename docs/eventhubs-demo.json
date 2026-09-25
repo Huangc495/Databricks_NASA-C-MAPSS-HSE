@@ -1,0 +1,273 @@
+{
+  "milestone": "Event Hubs (Kafka endpoint) streaming demo, bounded",
+  "recorded": "2026-09-25",
+  "prices_checked": {
+    "source": "Azure Retail Prices API, westus2, CAD, 2026-09-25",
+    "standard_throughput_unit_per_hour": 0.0416,
+    "standard_ingress_per_million_events": 0.0388,
+    "standard_kafka_endpoint_meter_per_hour": 0.1247,
+    "note": "The pricing page lists Kafka as included in Standard; the Kafka meter was budgeted as a worst case. Check the meter-level cost once posted."
+  },
+  "infrastructure": {
+    "template": "infra/eventhubs-demo.bicep",
+    "provider_registered": "Microsoft.EventHub (2026-09-25 02:22 UTC)",
+    "namespace": "evhns-sentinelops-7s5fwy",
+    "sku": "Standard, 1 TU, TLS 1.2, Kafka enabled",
+    "hub": "cmapss-telemetry (2 partitions, 1-day retention)",
+    "sas_policies": {
+      "cmapss-listen": [
+        "Listen"
+      ],
+      "cmapss-send": [
+        "Send"
+      ]
+    },
+    "created_utc": "2026-09-25T02:23:04Z",
+    "deleted_utc": "2026-09-25T03:06:31Z",
+    "lifetime_minutes": 43.5,
+    "deletion_confirmed": "az resource show -> ResourceNotFound",
+    "secret_scope": "sentinelops-eventhubs (key cmapss-listen); created 02:29, deleted 03:06 UTC"
+  },
+  "producer": {
+    "source": "data/cmapss/test_FD001.txt (NASA C-MAPSS, archive MD5 79a22f36e80606c69d0e9e4da5bb2b7a)",
+    "namespace": "evhns-sentinelops-7s5fwy",
+    "hub": "cmapss-telemetry",
+    "partitions": 2,
+    "events": 13096,
+    "sent": 13096,
+    "error": null,
+    "per_partition": {
+      "0": 6253,
+      "1": 6843
+    },
+    "started_at": "2026-09-25T02:30:07.128710+00:00",
+    "finished_at": "2026-09-25T02:30:16.935278+00:00",
+    "batches": 33,
+    "batch_statuses": [
+      201
+    ],
+    "max_batch_bytes": 261790,
+    "api": "REST batch send to /partitions/{p}/messages, SAS token (1 hour), standard library only"
+  },
+  "event_hubs_metrics": {
+    "window_utc": "2026-09-25T02:20Z/03:00Z",
+    "IncomingMessages": 13096,
+    "IncomingBytes": 7653304,
+    "OutgoingMessages": 13096
+  },
+  "job": {
+    "name": "cmapss_stream_ingest",
+    "job_id": 637313705889552
+  },
+  "pipeline": {
+    "name": "cmapss_stream",
+    "pipeline_id": "aab883b8-f23a-4ebc-a28f-9bd79f5c6747"
+  },
+  "local_rehearsal": {
+    "events": 13096,
+    "engines": 100,
+    "batches": 33,
+    "value_mismatches_after_json_round_trip": 0,
+    "cells_checked": 314304
+  },
+  "runs": [
+    {
+      "run_id": 568883254693144,
+      "purpose": "First read: every replayed event through the Kafka endpoint",
+      "state": "SUCCESS",
+      "tasks": {
+        "verify": {
+          "run_id": 798107039981602,
+          "state": "SUCCESS",
+          "minutes": 7.9,
+          "setup_minutes": 4.6,
+          "execution_minutes": 3.3,
+          "summary": {
+            "expected_events": 13096,
+            "events": 13096,
+            "event_ids": 13096,
+            "partitions": [
+              {
+                "partition": 0,
+                "events": 6253,
+                "first_offset": 0,
+                "last_offset": 6252,
+                "contiguous": true
+              },
+              {
+                "partition": 1,
+                "events": 6843,
+                "first_offset": 0,
+                "last_offset": 6842,
+                "contiguous": true
+              }
+            ],
+            "first_enqueued": "2026-09-25 02:30:06.815000",
+            "last_enqueued": "2026-09-25 02:30:15.901000",
+            "quarantined": 0,
+            "silver_rows": 13096,
+            "missing_from_stream": 0,
+            "not_in_file": 0,
+            "different_values": 0,
+            "matched": 13096,
+            "out_of_order": 0,
+            "engines": 100,
+            "max_partitions_per_engine": 1,
+            "seconds": 188.0
+          }
+        },
+        "stream": {
+          "run_id": 90756919445041,
+          "state": "SUCCESS",
+          "minutes": 10.4,
+          "setup_minutes": 0.0,
+          "execution_minutes": 10.4
+        }
+      },
+      "pipeline_update": {
+        "update_id": "1bbc4074-454e-4a3c-b0aa-3830f9b3f745",
+        "state": "COMPLETED",
+        "flows": [
+          {
+            "flow": "sentinelops_dev.bronze.cmapss_stream_events",
+            "refresh": "STREAMING_APPEND",
+            "output_rows": 13096,
+            "data_quality": null
+          },
+          {
+            "flow": "sentinelops_dev.silver.cmapss_stream_observations",
+            "refresh": "COMPLETE_RECOMPUTE",
+            "output_rows": 13096,
+            "data_quality": {
+              "dropped_records": 0,
+              "expectations": [
+                {
+                  "dataset": "valid_events",
+                  "failed_records": 0,
+                  "name": "event_id_matches_keys",
+                  "passed_records": 13096
+                },
+                {
+                  "dataset": "valid_events",
+                  "failed_records": 0,
+                  "name": "finite_values",
+                  "passed_records": 13096
+                },
+                {
+                  "dataset": "valid_events",
+                  "failed_records": 0,
+                  "name": "valid_keys",
+                  "passed_records": 13096
+                },
+                {
+                  "dataset": "valid_events",
+                  "failed_records": 0,
+                  "name": "is_json_object",
+                  "passed_records": 13096
+                },
+                {
+                  "dataset": "valid_events",
+                  "failed_records": 0,
+                  "name": "schema_conforms",
+                  "passed_records": 13096
+                }
+              ],
+              "warned_records": 0
+            }
+          },
+          {
+            "flow": "sentinelops_dev.silver.cmapss_stream_quarantine",
+            "refresh": "COMPLETE_RECOMPUTE",
+            "output_rows": 0,
+            "data_quality": {
+              "dropped_records": 0,
+              "warned_records": 0
+            }
+          }
+        ]
+      }
+    },
+    {
+      "run_id": 865371030010789,
+      "purpose": "Rerun proof: nothing new in the hub, so nothing appended and Silver NO_OP",
+      "state": "SUCCESS",
+      "tasks": {
+        "verify": {
+          "run_id": 11918604508871,
+          "state": "SUCCESS",
+          "minutes": 8.5,
+          "setup_minutes": 4.6,
+          "execution_minutes": 3.9,
+          "summary": {
+            "expected_events": 13096,
+            "events": 13096,
+            "event_ids": 13096,
+            "partitions": [
+              {
+                "partition": 0,
+                "events": 6253,
+                "first_offset": 0,
+                "last_offset": 6252,
+                "contiguous": true
+              },
+              {
+                "partition": 1,
+                "events": 6843,
+                "first_offset": 0,
+                "last_offset": 6842,
+                "contiguous": true
+              }
+            ],
+            "first_enqueued": "2026-09-25 02:30:06.815000",
+            "last_enqueued": "2026-09-25 02:30:15.901000",
+            "quarantined": 0,
+            "silver_rows": 13096,
+            "missing_from_stream": 0,
+            "not_in_file": 0,
+            "different_values": 0,
+            "matched": 13096,
+            "out_of_order": 0,
+            "engines": 100,
+            "max_partitions_per_engine": 1,
+            "seconds": 222.5
+          }
+        },
+        "stream": {
+          "run_id": 280659997181856,
+          "state": "SUCCESS",
+          "minutes": 6.7,
+          "setup_minutes": 0.0,
+          "execution_minutes": 6.7
+        }
+      },
+      "pipeline_update": {
+        "update_id": "25aa0112-7a27-480e-a93d-919d2d7f7461",
+        "state": "COMPLETED",
+        "note": "NO_OP flows rewrote nothing; their reported output_rows is an event metric, not the table row count.",
+        "flows": [
+          {
+            "flow": "sentinelops_dev.bronze.cmapss_stream_events",
+            "refresh": "STREAMING_APPEND",
+            "output_rows": 0,
+            "data_quality": null
+          },
+          {
+            "flow": "sentinelops_dev.silver.cmapss_stream_observations",
+            "refresh": "NO_OP",
+            "output_rows": 0,
+            "data_quality": {}
+          },
+          {
+            "flow": "sentinelops_dev.silver.cmapss_stream_quarantine",
+            "refresh": "NO_OP",
+            "output_rows": 0,
+            "data_quality": {
+              "dropped_records": 0,
+              "warned_records": 0
+            }
+          }
+        ]
+      }
+    }
+  ]
+}

@@ -2,9 +2,6 @@ import datetime as dt
 import json
 from pathlib import Path
 import re
-import sys
-import types
-from unittest import mock
 
 import yaml
 
@@ -80,23 +77,9 @@ def test_monthly_counts_hot_days_and_flags_partial_months():
     assert july["mean_max_c"] == (35.0 + 34.9) / 2 and july["highest_apparent_max_c"] == 39.5
 
 
-def load_pipeline():
-    """Execute pipelines/weather.py with stand-ins for Spark: its constants are what we compare."""
-    fake = {name: types.ModuleType(name) for name in ("pyspark", "pyspark.pipelines", "pyspark.sql")}
-    fake["pyspark"].pipelines = fake["pyspark.pipelines"]
-    fake["pyspark.sql"].functions, fake["pyspark.sql"].Window = mock.MagicMock(), mock.MagicMock()
-    for decorator in ("table", "materialized_view", "temporary_view", "expect_all_or_drop"):
-        setattr(fake["pyspark.pipelines"], decorator, lambda *a, **k: (lambda f: f))
-    spark = mock.MagicMock()
-    spark.conf.get.side_effect = {"sentinelops.catalog": "c", "sentinelops.weather_landing": "/landing"}.get
-    namespace = {"spark": spark}
-    with mock.patch.dict(sys.modules, fake):
-        exec(compile((ROOT / "pipelines/weather.py").read_text(encoding="utf-8"), "weather.py", "exec"), namespace)
-    return namespace
-
-
-def test_pipeline_and_reference_share_one_contract():
-    pipeline = load_pipeline()
+def test_pipeline_and_reference_share_one_contract(load_pipeline):
+    pipeline = load_pipeline("pipelines/weather.py", {"sentinelops.catalog": "c",
+                                                        "sentinelops.weather_landing": "/landing"})
     assert tuple(pipeline["RULES"]) == weather.RULES and pipeline["HOT_DAYS"] == weather.HOT_DAYS
     assert pipeline["DAILY"] == om.DAILY and pipeline["ATTRIBUTION"] == om.ATTRIBUTION
     flat = pipeline["RESPONSE_SCHEMA"]

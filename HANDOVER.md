@@ -1,11 +1,11 @@
 # SentinelOps — handover for the next session
 
-Last updated: September 25, 2026, 02:05 UTC. Git `main` holds every milestone,
-one commit each (latest: `abbba3b`, REST API ingestion). There is no remote; see
-section 6.
+Last updated: September 25, 2026, 03:15 UTC. Git `main` holds every milestone,
+one commit each (latest: `abbba3b`, REST API ingestion; the Event Hubs demo
+awaits the user's go-ahead to commit). There is no remote; see section 6.
 
 **Where things stand.** Both halves of the portfolio project run in Azure
-Databricks, and every job is manual, bounded and verified. 29 of the 40
+Databricks, and every job is manual, bounded and verified. 31 of the 40
 tracked tasks are done. The **Task status** table at the top of
 [docs/STATUS.md](docs/STATUS.md) is the authoritative tracker; update it as
 work lands.
@@ -41,13 +41,21 @@ work lands.
   - A verify task that recomputes the tables from the raw files and gets them
     bit-identical.
   - Two backfill runs, then a rerun with 0 API calls and 0 rows appended.
+- **Streaming (Event Hubs Kafka endpoint, a bounded demo, now deleted):**
+  - 13,096 FD001 test events were replayed from this machine (standard-library
+    REST producer; each engine in one partition, in order).
+  - The `cmapss_stream` pipeline read them back over Kafka, and all of them
+    were bit-identical to the file-ingested observations. The rerun appended
+    0.
+  - The listen key lived in a Databricks secret scope. The namespace existed
+    for 43.5 minutes; it and the scope were deleted afterwards.
 - **Cost guardrails:**
   - Azure budget `sentinelops-dev-monthly` (CAD 150/month, email alerts);
   - the starter SQL warehouse is 2X-Small with a 5-minute auto-stop.
 
-**Next task:** the Event Hubs streaming demo (section 3, task B). It needs
-the user's approval of a billable namespace, a secret scope and a new client
-dependency.
+**Next task:** environments and CI/CD (section 3, task C). It needs the
+user's choice of GitHub repository and visibility, plus catalogs, service
+principals and grants, which are permission changes.
 
 ## 1. Start here
 
@@ -66,14 +74,16 @@ dependency.
 ```powershell
 . ./scripts/Use-SentinelOps.ps1
 az account show --query '{name:name,id:id,user:user.name}' -o json
-.venv/Scripts/python.exe -m pytest -q                      # expect 108 passed
+.venv/Scripts/python.exe -m pytest -q                      # expect 115 passed
 .tools/databricks/databricks.exe bundle validate --strict -t dev
-.tools/databricks/databricks.exe bundle plan -t dev        # expect only the 4 known no-op job "updates" (section 4)
+.tools/databricks/databricks.exe bundle plan -t dev        # expect only the 5 known no-op job "updates" (section 4)
 .tools/databricks/databricks.exe jobs list-runs --active-only -o json
 .tools/databricks/databricks.exe clusters list -o json
 .tools/databricks/databricks.exe warehouses list -o json   # starter warehouse: STOPPED, 2X-Small, auto-stop 5
 .tools/databricks/databricks.exe serving-endpoints list -o json   # only databricks-* endpoints
 .tools/databricks/databricks.exe vector-search-endpoints list-endpoints -o json   # expect none
+.tools/databricks/databricks.exe secrets list-scopes -o json   # expect none (the demo scope was deleted)
+az eventhubs namespace list --query "[].name" -o json      # expect [] (the demo namespace was deleted)
 .tools/databricks/databricks.exe model-versions get-by-alias sentinelops_dev.sentinelops_dev.turbofan_rul champion -o json
 ```
 
@@ -83,11 +93,18 @@ az account show --query '{name:name,id:id,user:user.name}' -o json
    - September 24 (UTC) was projected at about CAD 14.5: ~13.4 before the
      weather backfill, which added ~CAD 0.7–1.1. The user approved going
      over CAD 10 against Azure credits that expire **October 10, 2026**.
+   - September 25: the fixed ~1.7 plus the Event Hubs demo, ≤ CAD 0.35 of
+     Event Hubs and ~0.3 of serverless.
    - Record the posted figures for September 24 and 25 in STATUS ("Cost and
-     runtime controls").
+     runtime controls"). For the 25th, check whether the "Standard Kafka
+     Endpoint" meter (CAD 0.1247/hour) billed on top of the throughput unit;
+     the pricing page says Kafka is included. `infra/cost-query-meters.json`
+     groups the same query by meter.
 
 ```powershell
 az rest --method post --url 'https://management.azure.com/subscriptions/b1026367-46bf-43e0-93b5-bbfcc45a2291/providers/Microsoft.CostManagement/query?api-version=2023-03-01' --body '@infra/cost-query.json' --query properties.rows -o json
+# By meter (for example, to see Event Hubs or model-serving meters):
+az rest --method post --url 'https://management.azure.com/subscriptions/b1026367-46bf-43e0-93b5-bbfcc45a2291/providers/Microsoft.CostManagement/query?api-version=2023-03-01' --body '@infra/cost-query-meters.json' --query properties.rows -o json
 ```
 
 ## 2. Authorization and non-negotiable constraints
@@ -153,8 +170,8 @@ then run in the cloud. Finish with the checklist in section 7.
 | # | Task | Approval needed | Cost character |
 |---|---|---|---|
 | A | REST API ingestion | Done (Open-Meteo weather) | About CAD 1 for the backfill; reruns make no API calls |
-| B | Event Hubs (Kafka endpoint) streaming demo (**next**) | Yes: namespace (billable), secret scope, new SDK dependency | Hourly namespace cost; delete the same day |
-| C | Environments and CI/CD (staging/prod, service principals, GitHub, OIDC) | Yes: repository and visibility, catalogs, principals, grants | Mostly free |
+| B | Event Hubs (Kafka endpoint) streaming demo | Done (bounded; namespace deleted) | ≤ CAD 0.35 of Event Hubs plus ~0.3 of serverless |
+| C | Environments and CI/CD (staging/prod, service principals, GitHub, OIDC) (**next**) | Yes: repository and visibility, catalogs, principals, grants | Mostly free |
 | D | Optional: agent deployment and review app | Yes: serving endpoint | Serving while scaled up, plus tokens |
 | E | Optional ML depth: FD002–FD004, tuning, `mlflow.evaluate`, sequence baseline, Lakehouse Monitoring | Landing upload (FD002–4); monitoring (billable) | Serverless minutes; monitoring has a 2× DBU multiplier |
 | F | Small follow-ups (below) | Varies | Cents |
@@ -180,30 +197,25 @@ Open-Meteo daily ERA5 weather. The design, terms and caveats are in
     pins its digest). That is landing `v2`, with a new append flow, as in
     masking v2.
 
-### B. Event Hubs streaming demo (next, bounded)
+### B. Event Hubs streaming demo (done, bounded)
 
-1. **Check prices** (Event Hubs Standard throughput unit per hour, plus
-   ingress). Standard is the lowest tier with the Kafka endpoint.
-2. **With approval:** create a namespace (Standard, 1 TU, `westus2`,
-   `rg-sentinelops-dev`), one hub (1–2 partitions), and a listen and a send
-   SAS policy.
-   - Put the listen connection string in a **Databricks-backed secret
-     scope** (`databricks secrets create-scope` / `put-secret`), never in the
-     repo.
-   - Delete the namespace **the same day** and confirm in the inventory.
-3. **Producer (local):** replay C-MAPSS FD001 **test** rows (local
-   `data/cmapss`) as JSON events. This needs a Kafka or Event Hubs client
-   library, which is a new dependency: ask.
-4. **Consumer:**
-   - A pipeline streaming table reading Kafka with `SASL_SSL` / `PLAIN`,
-     user `$ConnectionString`, the secret as password, port 9093, into Bronze
-     `cmapss_stream_events`.
-   - Triggered, not continuous.
-   - Check the current docs for Kafka support in serverless pipelines, and
-     for reading secrets there.
-5. **Evidence:** events sent = rows landed; a rerun appends 0.
+The design, prices, runbook and caveats are in `docs/INGESTION.md`
+("Streaming ingestion"); the evidence is in `docs/eventhubs-demo.json`. To
+repeat it for the demo script (G), with approval:
+1. Deploy `infra/eventhubs-demo.bicep` (what-if first). The provider is
+   already registered.
+2. Run `scripts/eventhubs_demo.py put-secret` (new keys each time).
+3. Fully refresh `cmapss_stream`: its checkpoint holds the old hub's offsets,
+   and a new hub starts at 0.
+4. Delete the old local send log in `artifacts/eventhubs/`, then run
+   `produce`.
+5. Run `cmapss_stream_ingest`.
+6. Delete the namespace and the scope the same day.
 
-### C. Environments and CI/CD
+Not done: feeding streamed events into Gold features or scoring. The stream
+stops at Silver, and verify proves its parity with the file path.
+
+### C. Environments and CI/CD (next)
 
 - **Ask the user for:**
   - the GitHub repository and visibility;
@@ -331,6 +343,12 @@ The masking gap no longer blocks this; masking v2 is verified.
     verify compares every run.
   - `python -m sentinelops.open_meteo` lands one local test response into
     `data/`; it counts as a download, so ask first.
+- **Streaming (Event Hubs):**
+  - `infra/eventhubs-demo.bicep`.
+  - `sentinelops.stream`: events, partition routing, batches, SAS, send.
+  - `scripts/eventhubs_demo.py`: `put-secret` and `produce`.
+  - Pipeline `cmapss_stream` and job `cmapss_stream_ingest` (stream →
+    verify); they only work while a namespace exists.
 - **Analytics:** `analytics_refresh` rebuilds `gold.osha_injury_facts` and
   `gold.cmapss_fleet_status`, adds comments for Genie, and runs every
   dashboard dataset and Genie example query. Edit
@@ -390,6 +408,11 @@ The masking gap no longer blocks this; masking v2 is verified.
 | Testing a pipeline file without pyspark | `tests/test_weather.py` runs `pipelines/weather.py` with stand-in modules and calls every dataset function. MagicMock has no `>`, so filter with SQL strings |
 | Three-task serverless job timing | Each task waited 3–5 min for compute. A no-op rerun still takes ~20 min wall, ~10 of them execution |
 | CLI prints "Databricks skills are not installed" | A hint on stderr from the CLI; ignore it (redirect stderr before parsing JSON) |
+| Sending events without a new dependency | Event Hubs' REST batch API (`POST https://<ns>.servicebus.windows.net/<hub>/partitions/<p>/messages`, `application/vnd.microsoft.servicebus.json`, SAS = HMAC-SHA256 over the URL-encoded URI and expiry) accepted 33 batches of ≤ 262 KB with HTTP 201. The Kafka consumer sees each `Body` string as the value |
+| Kafka offsets on Event Hubs | They start at 0 and are contiguous per partition (the sequence numbers). A recreated hub restarts at 0, so a pipeline checkpoint from an old hub needs a full refresh |
+| Keys in PowerShell pipelines | Piping a key from `az` into another CLI adds a newline, and arguments show up in transcripts. Read keys with `subprocess` inside Python and pass them to the SDK (`scripts/eventhubs_demo.py`) |
+| `az resource list -g rg-sentinelops-dev` returned `[]` | Seen right after deleting the namespace, while the workspace, storage and connector existed. Check resources by ID (`az resource show --ids`) before concluding anything |
+| SDK warns "Failed to get token for subscription" | The azure-cli auth fallback; harmless. PowerShell 5.1 still shows it as a `NativeCommandError` |
 | Browser checks of the workspace | The in-app browser needs the user to sign in, and it can't save screenshots or zoom. Claude in Chrome was not connected on September 24 |
 
 ## 5. Resources
@@ -423,11 +446,16 @@ the budget in `infra/budget.json`, and the demo endpoint in
 | dashboards `fleet_health` / `safety_incidents` | `01f1b83350951effa1d1f1bc6ca9e6cd` / `01f1b83350861a42888ebab34d8a8785` | Published, viewer credentials |
 | pipeline `weather_open_meteo` | `8eca1296-fbee-409a-a093-f3d8b82ca7f6` | Open-Meteo Bronze→Silver→Gold; updates `974f3091…`, `a2097c00…`, `edd01293…` (rerun, all NO_OP) |
 | job `weather_ingest` | `584629930216724` | Fetch → pipeline → verify: runs `795987049449431`, `722495160937045`, rerun `899114500995009` |
+| pipeline `cmapss_stream` | `aab883b8-f23a-4ebc-a28f-9bd79f5c6747` | Event Hubs Kafka → Bronze/Silver; updates `1bbc4074…` (13,096), `25aa0112…` (rerun, 0) |
+| job `cmapss_stream_ingest` | `637313705889552` | Stream → verify: runs `568883254693144`, rerun `865371030010789`; needs a live namespace |
 | genie space `sentinelops_operations` | `01f1b8347de912dc8d94fcb07a9144ec` | 6 curated Gold tables |
 
 - All jobs are manual, STANDARD, one concurrent run, zero retries (including
   serverless auto-optimization), with timeouts and no schedules.
 - Pipelines are triggered serverless, with development mode off.
+- The Event Hubs namespace `evhns-sentinelops-7s5fwy` (02:23–03:06 UTC,
+  September 25) and the secret scope `sentinelops-eventhubs` were deleted.
+  The `Microsoft.EventHub` provider stays registered (free).
 - The serving endpoint `sentinelops-rul-demo` was deleted on September 24.
   Its inference table, `sentinelops_dev.sentinelops_dev.turbofan_rul_demo_payload`,
   is kept.
@@ -448,8 +476,8 @@ the budget in `infra/budget.json`, and the demo endpoint in
     reads).
 - **Tables:**
   - `bronze.{cmapss_lines, cmapss_labels, osha_sir_reports}`
-  - `bronze.open_meteo_daily`
-  - `silver.{cmapss_observations, cmapss_quarantine, cmapss_conflicts, cmapss_endpoint_labels, osha_incidents, osha_quarantine, weather_daily, weather_quarantine}`
+  - `bronze.{open_meteo_daily, cmapss_stream_events}`
+  - `silver.{cmapss_observations, cmapss_quarantine, cmapss_conflicts, cmapss_endpoint_labels, osha_incidents, osha_quarantine, weather_daily, weather_quarantine, cmapss_stream_observations, cmapss_stream_quarantine}`
   - `gold.{cmapss_features, cmapss_training_labels, cmapss_test_endpoints, cmapss_predictions, cmapss_model_performance, cmapss_feature_drift, cmapss_alerts, cmapss_fleet_status, osha_documents, osha_embeddings, osha_extractions, osha_injury_facts, weather_state_monthly}`
   - bootstrap `sentinelops_dev.{silver_fd001_train, gold_fd001_features, gold_fd001_predictions}`
 
@@ -466,6 +494,7 @@ the budget in `infra/budget.json`, and the demo endpoint in
     never upload, commit or print names from it**);
   - `data/landing/*` (prepared landing files: `v1`, `osha_v1`, `osha_v2`);
   - `data/open_meteo/rehearsal` (the one local test response);
+  - `artifacts/eventhubs/` (the producer's send log; no keys);
   - `artifacts/`.
 - **Pinned cloud dependencies** (serverless environment 4 / Python 3.12):
   numpy 2.5.3, pandas 2.3.3, scikit-learn 1.9.1, MLflow 3.16.1, skops 0.15.0,
@@ -475,7 +504,7 @@ the budget in `infra/budget.json`, and the demo endpoint in
   (repo-local config), no remote.
   - Recent milestones: `b94c34a` dashboards/Genie/budget, `d8bfec0`
     serving, `9c1b93e` eval v2, `7a863dd` masking v2, `abbba3b` REST API
-    ingestion.
+    ingestion; the Event Hubs demo is not committed yet.
   - The CI workflow `.github/workflows/ci.yml` has never run.
 
 ## 7. Working agreement that has served well

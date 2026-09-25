@@ -106,3 +106,11 @@ weighted-call budget and lands the raw responses unchanged in
 Bronze → Silver (with quarantine) → Gold `weather_state_monthly`, keyed by
 state and month like OSHA's reports. A verify task recomputes the tables from
 the raw files. See [INGESTION.md](INGESTION.md#rest-api-ingestion-open-meteo-weather).
+
+Streaming ingestion is a bounded demo with its own pipeline, `cmapss_stream`.
+A local producer posts C-MAPSS events to an Azure Event Hubs namespace that
+exists only during a demo (`infra/eventhubs-demo.bicep`). The pipeline reads
+them through the Kafka endpoint, with the listen key in a Databricks secret
+scope, into Bronze → Silver (with quarantine). A verify task proves they
+equal the file-ingested observations. See
+[INGESTION.md](INGESTION.md#streaming-ingestion-event-hubs-kafka-endpoint-bounded-demo).

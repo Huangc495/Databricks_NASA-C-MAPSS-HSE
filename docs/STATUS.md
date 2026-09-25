@@ -1,23 +1,24 @@
 # Build status
 
-Last verified: September 25, 2026, 02:05 UTC (REST API ingestion, Open-Meteo weather; committed as `abbba3b`).
+Last verified: September 25, 2026, 03:15 UTC (Event Hubs streaming demo; namespace deleted).
 
 **At a glance.**
 
-- **Progress:** 29 of 40 tracked tasks are done. Next is the Event Hubs
-  streaming demo (it needs your approval of a billable namespace, a secret
-  scope and a new client dependency); 8 tasks are not started and 2 are
-  deferred.
-- **Live state (read-only checks):** no active job runs, no classic clusters,
-  no Vector Search or custom serving endpoints, and all pipelines IDLE. The
+- **Progress:** 31 of 40 tracked tasks are done. Next is environments and
+  CI/CD (it needs your choice of GitHub repository and visibility, catalogs,
+  service principals and grants); 6 tasks are not started and 2 are deferred.
+- **Live state (read-only checks):** no Event Hubs namespace (deleted at
+  03:06 UTC), no secret scopes, no active job runs, no classic clusters, no
+  Vector Search or custom serving endpoints, and all pipelines IDLE. The
   starter warehouse is STOPPED (2X-Small, 5-minute auto-stop). `@champion` is
   v3 (READY).
-- **Cost:** September 24 is projected at about CAD 14.5 (over CAD 10): the
-  earlier ~13.4 plus the REST API milestone (~1). The serving demo, eval v2,
-  masking v2 and the weather backfill were approved against your credits,
-  which expire October 10. See "Cost and runtime controls".
+- **Cost:** September 24 closed at a projected ~CAD 14.5 (CAD 11.65 posted by
+  02:05 UTC on September 25). September 25 so far: the fixed ~1.7/day, plus
+  the Event Hubs demo, ≤ CAD 0.35 of Event Hubs and ~0.3 of serverless. All
+  against your credits, which expire October 10. See "Cost and runtime
+  controls".
 - **Git:** every milestone is committed on `main` (latest `abbba3b`, REST API
-  ingestion); there is no remote.
+  ingestion; the Event Hubs demo is not committed yet); there is no remote.
 
 ## Task status
 
@@ -31,12 +32,12 @@ cost or prerequisites, with the reason given.
 | Task | Status | Evidence or next action |
 |---|---|---|
 | Azure foundation: ADLS Gen2, workspace, access connector, UC catalog | Done | `infra/main.bicep`; "Azure" section below |
-| Bundle deployment (dev target, strict validation, manual jobs) | Done | `databricks.yml`, `resources/*.yml`; 15 jobs, 3 pipelines, 2 dashboards and 1 Genie space deployed; a test enforces job guardrails, including no serverless auto-retries |
+| Bundle deployment (dev target, strict validation, manual jobs) | Done | `databricks.yml`, `resources/*.yml`; 16 jobs, 4 pipelines, 2 dashboards and 1 Genie space deployed; a test enforces job guardrails, including no serverless auto-retries |
 | Cost visibility: meter-level Azure cost query | Done | Found an always-on NAT gateway/IP, ~CAD 1.7/day ("Cost and runtime controls") |
 | Azure budget alert | Done | Budget `sentinelops-dev-monthly` (your choice): CAD 150/month on both SentinelOps resource groups; emails at 50/80/100% of actual and 100% of forecast; `infra/budget.json`. A tripwire (alerts lag 8–24 h), not a cutoff |
 | Databricks billing tables (`system.billing`) access | Not started | Needs an account/metastore admin grant |
 | dev/staging/prod catalogs, service principals, `run_as` | Not started | After the demo features are complete |
-| Secrets in Key Vault or a secret scope | Not started | Needed once API keys or Event Hubs credentials exist |
+| Secrets in Key Vault or a secret scope | Done (demo) | Databricks-backed scope `sentinelops-eventhubs` held the Event Hubs listen key, read by the pipeline with `dbutils.secrets.get`; the send key never left the producer's process. Deleted with the namespace |
 | Private Link / VNet hardening | Deferred | Cost and complexity; public endpoints use authenticated access only |
 
 ### Data engineering
@@ -47,7 +48,7 @@ cost or prerequisites, with the reason given.
 | Incremental ingestion probe and no-input rerun | Done | `medallion-probe-*.json`, `medallion-rerun-update.json` |
 | FD002–FD004 (multiple operating conditions) | Not started | Keys and `--subset` already support it; needs condition-aware features |
 | REST API ingestion (Open-Meteo weather) | Done | Job `weather_ingest`: budgeted, resumable fetch of 220 raw responses into immutable landing → Auto Loader Bronze/Silver/Gold → verify against the raw files; two backfill runs, then a rerun with 0 API calls and 0 rows appended; `weather-backfill.json` |
-| Event Hubs (Kafka endpoint) streaming | **Next** | Bills while the namespace exists: demo only, then delete. Needs your approval of the namespace, a secret scope and a new client dependency |
+| Event Hubs (Kafka endpoint) streaming | Done (bounded demo) | 13,096 FD001 events replayed locally (stdlib REST producer) → Kafka endpoint → pipeline `cmapss_stream`: all bit-identical to the file-ingested observations; rerun appended 0; namespace lived 43.5 min, then deleted; `eventhubs-demo.json` |
 
 ### Predictive-maintenance ML
 
@@ -86,17 +87,85 @@ cost or prerequisites, with the reason given.
 |---|---|---|
 | Unit tests (92) and local CI workflow file | Done (local) | `.github/workflows/ci.yml` has never run: no remote |
 | Git history | Done (local) | Branch `main`; no remote; one commit per milestone (`git log`) |
-| GitHub repository, CI runs, OIDC deployment to staging/prod | Not started | Needs your choice of repository and visibility |
+| GitHub repository, CI runs, OIDC deployment to staging/prod | **Next** | Needs your choice of repository and visibility, plus catalogs, service principals and grants |
 | AI/BI dashboards and Genie space | Done | Fleet health and Safety incidents dashboards, Genie space over 6 curated Gold tables, `analytics_refresh` job; Genie 7/8 held-out questions fully right (one miscounted summary); [ANALYTICS.md](ANALYTICS.md) |
 | SQL warehouse right-sizing | Done | Starter warehouse Small → 2X-Small, auto-stop 10 → 5 min (your approval); a wake-up now costs ~CAD 0.35, not ~2.3 |
 | Demo script and portfolio write-up | Not started | Last |
 
-Recommended order (details in HANDOVER.md): Event Hubs streaming demo →
-environments and CI/CD → optional ML depth and agent deployment → demo
-script and write-up. The budget alert, dashboards/Genie, serving demo,
-eval v2, masking v2 and REST API ingestion are done.
+Recommended order (details in HANDOVER.md): environments and CI/CD →
+optional ML depth and agent deployment → demo script and write-up. The budget
+alert, dashboards/Genie, serving demo, eval v2, masking v2, REST API ingestion
+and the Event Hubs demo are done.
 
-## Current milestone: REST API ingestion (Open-Meteo weather)
+## Current milestone: Event Hubs streaming demo (bounded)
+
+Events, the third ingestion style. C-MAPSS FD001 test trajectories were
+replayed from this machine into Azure Event Hubs and read back through its
+Kafka endpoint. Details:
+[INGESTION.md](INGESTION.md#streaming-ingestion-event-hubs-kafka-endpoint-bounded-demo);
+evidence [eventhubs-demo.json](eventhubs-demo.json).
+
+- **Your choices and approvals:** a local producer using only the standard
+  library, via the REST batch API (no new dependency). You approved:
+  - registering the `Microsoft.EventHub` provider;
+  - the namespace, the secret scope, and the deploy and runs;
+  - same-day deletion.
+- **Prices checked first** (CAD, `westus2`): throughput unit 0.0416/hour and
+  ingress 0.0388 per million events. The price list also has a "Standard
+  Kafka Endpoint" meter at 0.1247/hour, although the pricing page lists Kafka
+  as included, so the worst case, ~0.17/hour, was budgeted. Confirm with the
+  meter-level cost once it posts.
+- **Infrastructure** (`infra/eventhubs-demo.bicep`, what-if first):
+  - namespace `evhns-sentinelops-7s5fwy`: Standard, 1 TU, TLS 1.2;
+  - hub `cmapss-telemetry`: 2 partitions, 1-day retention;
+  - SAS policies `cmapss-listen` (Listen only) and `cmapss-send` (Send only).
+  - It existed from **02:23:04 to 03:06:31 UTC (43.5 min)**. Deletion was
+    confirmed (`ResourceNotFound`).
+- **Secrets:**
+  - The listen key went from the Azure CLI straight into the
+    Databricks-backed scope `sentinelops-eventhubs`, via the SDK.
+  - The send key only signed a one-hour SAS token inside the producer.
+  - Neither was printed, written or passed on a command line. The scope was
+    deleted afterwards.
+- **Producer:**
+  - 13,096 events (100 engines) in 33 batches, all HTTP 201, in 10 seconds.
+  - Each engine went to one partition, in cycle order: 6,253 and 6,843.
+  - Event Hubs' metrics agree: 13,096 incoming and 13,096 outgoing messages
+    (7.65 MB in).
+- **Job `cmapss_stream_ingest`** (`637313705889552`): pipeline `cmapss_stream`
+  (`aab883b8-f23a-4ebc-a28f-9bd79f5c6747`) → verify.
+  - **Run 1 `568883254693144` SUCCESS.** Update `1bbc4074…`: Bronze
+    appended **13,096**, every `event_id` once, and the offsets are
+    **contiguous** (0–6252 and 0–6842). All 5 rules passed; 0 quarantined.
+    **All 13,096 streamed observations are bit-identical** to the
+    file-ingested `silver.cmapss_observations`, with 0 missing and 0 extra.
+    0 cycles arrived out of order.
+  - **Run 2 `865371030010789` SUCCESS: the rerun proof.** Update
+    `25aa0112…`: Bronze appended **0**, Silver was `NO_OP`, and verify passed
+    with the same counts.
+- **Local rehearsal first:** the JSON round trip of all 314,304 values of the
+  real file gave 0 mismatches, and the batch sizes stayed ≤ 262 KB.
+- **Cost:** Event Hubs ≤ CAD 0.35 (at most two started hours at the worst-case
+  rate; ingress ≈ 0). Serverless: about 33 minutes of task time, ~24 of them
+  execution, ≈ CAD 0.3. Nothing is running afterwards.
+- **Caveats:**
+  - The producer doesn't retry, because a timed-out batch might have been
+    accepted. The consumer counts duplicates instead.
+  - `cmapss_stream_ingest` can only run while a namespace exists. A new one
+    needs `put-secret` and a full refresh of `cmapss_stream`, whose checkpoint
+    holds the old offsets.
+- **Tests:** 115 pass (7 new):
+  - event values round-trip exactly;
+  - each engine stays in one partition, in order;
+  - batch limits;
+  - SAS signing;
+  - no retry after a rejected batch;
+  - the pipeline's rules and Kafka options against the event shape;
+  - names agree across the Bicep, bundle and script.
+
+  The pipeline stand-in loader is now a shared fixture.
+
+## Earlier milestone: REST API ingestion (Open-Meteo weather)
 
 A third ingestion style, next to files: a REST API fetched into immutable
 landing, then Auto Loader into Bronze/Silver/Gold. Committed as `abbba3b`.
@@ -749,7 +818,8 @@ section is kept only so older links still resolve.
   | Day | Posted | By meter | Notes |
   |---|---|---|---|
   | September 23 | CAD 5.41 (final) | Serverless SQL 2.16, serverless jobs 1.85, NAT and IP 1.31 (19 h) | The projection of CAD 3–4 missed a Catalog Explorer browse at 19:23 UTC, which ran the Small warehouse for about 11 minutes (2.2 DBU) |
-  | September 24 | CAD 11.65 by 02:05 UTC on September 25 (usage to ~17:00) | At the 8.05 posted by 16:55 UTC: serverless jobs 2.60, serverless SQL 2.42 (Catalog Explorer, 05:44), model calls 2.23, NAT and IP 0.76 | Projected ≈ CAD 13.4: the fixed remainder (~0.9), dashboards/Genie (~1.6), the serving demo and eval v2 (~2.0: serving ≤0.35, jobs ~0.5, model calls ~0.4, warehouse checks ~0.7), then masking v2 (~0.8). Over CAD 10; you approved it against credits expiring October 10. Then the weather backfill (21:51–23:50 UTC, ~CAD 0.7–1.1), so ≈ CAD 14.5. CAD 8.86 had posted by 23:55 UTC and 11.65 by 02:05 UTC on September 25. The Cost Management API returns 429 in bursts, so recheck later |
+  | September 24 | CAD 11.65 by 02:05 UTC on September 25 (usage to ~17:00) | At 11.65 (`infra/cost-query-meters.json`): serverless jobs 3.17, serverless SQL 4.37, serverless real-time inference 2.57 (pay-per-token model calls plus the serving demo), NAT and IP 1.48. At the 8.05 posted by 16:55 UTC: serverless jobs 2.60, serverless SQL 2.42 (Catalog Explorer, 05:44), model calls 2.23, NAT and IP 0.76 | Projected ≈ CAD 13.4: the fixed remainder (~0.9), dashboards/Genie (~1.6), the serving demo and eval v2 (~2.0: serving ≤0.35, jobs ~0.5, model calls ~0.4, warehouse checks ~0.7), then masking v2 (~0.8). Over CAD 10; you approved it against credits expiring October 10. Then the weather backfill (21:51–23:50 UTC, ~CAD 0.7–1.1), so ≈ CAD 14.5. CAD 8.86 had posted by 23:55 UTC and 11.65 by 02:05 UTC on September 25. The Cost Management API returns 429 in bursts, so recheck later |
+  | September 25 | Not posted yet | — | Projected ≈ CAD 2.5–3: the fixed ~1.7, the Event Hubs demo (namespace 02:23–03:06 UTC, ≤ 0.35 at the worst-case rate with the Kafka meter; ~0.3 of serverless). Confirm the Event Hubs meters (throughput unit, Kafka endpoint) once posted |
 
 - **Rates** (Azure Retail Prices, `westus2`, CAD):
   - serverless jobs CAD 0.62/DBU (about 1.5 DBU per hour of job time);
